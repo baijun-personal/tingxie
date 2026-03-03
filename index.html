@@ -322,6 +322,9 @@ function segmentChinese(text) {
   // Spot-check helpers (stroke count + canvas + OCR)
   // =========================
 
+  // Last prepared OCR image (dataURL) for manual review
+  let lastOcrPreparedDataUrl = "";
+
   // Cache stroke counts in memory + localStorage (no key needed)
   const STROKE_CACHE_KEY = "tingxie_v3_stroke_cache";
   let strokeCache = {};
@@ -523,7 +526,8 @@ function segmentChinese(text) {
     octx.imageSmoothingEnabled = true;
     octx.drawImage(crop, 0, 0, cw, ch, dx, dy, dw, dh);
 
-    return out.toDataURL("image/png").split(",")[1];
+    lastOcrPreparedDataUrl = out.toDataURL("image/png");
+    return lastOcrPreparedDataUrl.split(",")[1];
   }
 
   async function recognizeWithGoogleVision() {
@@ -622,12 +626,28 @@ function segmentChinese(text) {
       gotChar: got || "",
       ok,
       ts: Date.now(),
+        img: lastOcrPreparedDataUrl || "",
     });
+
+    // Fallback plan: if OCR mismatch, mark as "需家长复核" instead of hard fail.
+    if (!ok) {
+      state.manualChecks = Array.isArray(state.manualChecks) ? state.manualChecks : [];
+      state.manualChecks.push({
+        idx: state.idx,
+        itemText: state.pendingCheck.itemText,
+        targetChar: expected,
+        gotChar: got || "",
+        recognized: (recognized || "").slice(0, 200),
+        img: lastOcrPreparedDataUrl || "",
+        ts: Date.now(),
+        reason: "OCR识别不一致（需家长复核）",
+      });
+    }
 
     persistIfNeeded();
 
     // If failed, highlight for later: we still allow progress, but keep a clear record
-    toast(ok ? "抽查通过 ✅" : "抽查不通过 ❌（已记录）");
+    toast(ok ? "抽查通过 ✅" : "抽查待复核（已记录）");
 
     state.pendingCheck = null;
     showCheckUI(false);
@@ -857,6 +877,32 @@ persistIfNeeded();
     return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
   }
 
+  function openReviewModal(item) {
+    el.reviewTitle.textContent = `需家长复核：第 ${item.idx + 1} 题`;
+    el.reviewMeta.textContent = `目标字：${item.targetChar}；识别：${item.gotChar || "（无）"}；原因：${item.reason || "识别不一致"}\n原句：${item.itemText}`;
+    el.reviewImg.src = item.img || "";
+    el.reviewModal.style.display = "flex";
+  }
+
+  function closeReviewModal() {
+    el.reviewModal.style.display = "none";
+    el.reviewImg.src = "";
+  }
+
+  function buildManualCheckSummary() {
+    const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
+    if (!arr.length) return ``;
+    const slice = arr.slice(-50);
+    const items = slice.map((it, i) => {
+      const label = `第 ${it.idx + 1} 题：抽查“${it.targetChar}”`;
+      // store index into slice (from newest to oldest)
+      const idx = slice.length - 1 - i;
+      return `<li><a href="#" class="reviewLink" data-review-idx="${idx}">${escapeHtml(label)}</a></li>`;
+    }).join("");
+    return `<div style="margin-top:10px;"><div class="muted">需家长复核（点击查看手写，最多显示最近 50 条）：</div><ul class="list">${items}</ul></div>`;
+  }
+
+
   function buildFlagsSummary() {
     const flags = Array.isArray(state.flags) ? state.flags : [];
     const bad = flags.filter(f => f && f.ok === false);
@@ -985,6 +1031,18 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
         gotChar: "(skipped)",
         ok: false,
         ts: Date.now(),
+        img: lastOcrPreparedDataUrl || (el.pad ? el.pad.toDataURL("image/png") : ""),
+      });
+      state.manualChecks = Array.isArray(state.manualChecks) ? state.manualChecks : [];
+      state.manualChecks.push({
+        idx: state.idx,
+        itemText: state.pendingCheck.itemText,
+        targetChar: state.pendingCheck.targetChar,
+        gotChar: "(skipped)",
+        recognized: "",
+        img: lastOcrPreparedDataUrl || (el.pad ? el.pad.toDataURL("image/png") : ""),
+        ts: Date.now(),
+        reason: "跳过抽查（需家长复核）",
       });
       toast("已跳过抽查（已记录）");
       state.pendingCheck = null;
@@ -998,10 +1056,42 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
 
   initPad();
 
+  // manual review modal events
+  if (el.reviewClose) el.reviewClose.addEventListener("click", closeReviewModal);
+  if (el.reviewModal) el.reviewModal.addEventListener("click", (e) => {
+    if (e.target === el.reviewModal) closeReviewModal();
+  });
+
+  // Click handler for review links in summary
+  document.addEventListener("click", (e) => {
+    const a = e.target && e.target.closest ? e.target.closest(".reviewLink") : null;
+    if (!a) return;
+    e.preventDefault();
+    const full = Array.isArray(state.manualChecks) ? state.manualChecks : [];
+    const slice = full.slice(-50);
+    const idx = Number(a.getAttribute("data-review-idx"));
+    const item = slice[idx];
+    if (item) openReviewModal(item);
+  });
+
+
   setPills();
   restoreIfNeeded();
   renderQuestion();
 })();
 </script>
+
+  <div id="reviewModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999;">
+    <div style="background:#fff;max-width:92vw;max-height:92vh;border-radius:14px;padding:12px;overflow:auto;">
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <div id="reviewTitle" class="pill"></div>
+        <button id="reviewClose">关闭</button>
+      </div>
+      <div class="muted" id="reviewMeta" style="margin-top:6px;white-space:pre-wrap;"></div>
+      <div style="margin-top:10px;display:flex;justify-content:center;">
+        <img id="reviewImg" alt="handwriting" style="max-width:86vw;max-height:70vh;border:1px solid #ddd;border-radius:12px;background:#fff;">
+      </div>
+    </div>
+  </div>
 </body>
 </html>
