@@ -398,7 +398,7 @@ function segmentChinese(text) {
   function initPad() {
     if (!el.pad) return;
     padCtx = el.pad.getContext("2d");
-    padCtx.lineWidth = 10;
+    padCtx.lineWidth = 14;
     padCtx.lineCap = "round";
     padCtx.strokeStyle = "#000";
 
@@ -447,29 +447,83 @@ function segmentChinese(text) {
   }
 
   function padToBase64() {
-    // Upscale + pad to improve OCR on small screens
-    const target = 640;
+    // Auto-crop to ink bounds + add padding + threshold + upscale.
     const src = el.pad;
-    const off = document.createElement("canvas");
-    off.width = target;
-    off.height = target;
-    const ctx = off.getContext("2d");
+    const w = src.width, h = src.height;
+    const srcCtx = src.getContext("2d");
+    const img = srcCtx.getImageData(0, 0, w, h);
+    const d = img.data;
 
-    // white background
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, target, target);
+    // Find bounding box of non-white pixels
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+        // treat anything not near-white as ink
+        if (a > 0 && (r < 245 || g < 245 || b < 245)) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
 
-    // Draw source centered, scaled up
-    const scale = Math.min(target / src.width, target / src.height) * 0.9;
-    const dw = src.width * scale;
-    const dh = src.height * scale;
+    // If no ink detected, just upscale whole canvas
+    if (maxX < 0) {
+      minX = 0; minY = 0; maxX = w - 1; maxY = h - 1;
+    }
+
+    const pad = 24; // padding around ink
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(w - 1, maxX + pad);
+    maxY = Math.min(h - 1, maxY + pad);
+
+    const cw = maxX - minX + 1;
+    const ch = maxY - minY + 1;
+
+    // Crop to offscreen canvas
+    const crop = document.createElement("canvas");
+    crop.width = cw;
+    crop.height = ch;
+    const cctx = crop.getContext("2d");
+    cctx.drawImage(src, minX, minY, cw, ch, 0, 0, cw, ch);
+
+    // Threshold to make strokes solid
+    const cimg = cctx.getImageData(0, 0, cw, ch);
+    const cd = cimg.data;
+    for (let i = 0; i < cd.length; i += 4) {
+      const r = cd[i], g = cd[i+1], b = cd[i+2], a = cd[i+3];
+      // grayscale
+      const gray = (r * 0.299 + g * 0.587 + b * 0.114);
+      // If pixel is near-white, set to white; else black
+      const isInk = a > 0 && gray < 240;
+      const v = isInk ? 0 : 255;
+      cd[i] = v; cd[i+1] = v; cd[i+2] = v; cd[i+3] = 255;
+    }
+    cctx.putImageData(cimg, 0, 0);
+
+    // Draw into a normalized 640x640 with margins
+    const target = 640;
+    const out = document.createElement("canvas");
+    out.width = target;
+    out.height = target;
+    const octx = out.getContext("2d");
+    octx.fillStyle = "#fff";
+    octx.fillRect(0, 0, target, target);
+
+    const scale = Math.min((target * 0.88) / cw, (target * 0.88) / ch);
+    const dw = cw * scale;
+    const dh = ch * scale;
     const dx = (target - dw) / 2;
     const dy = (target - dh) / 2;
 
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(src, dx, dy, dw, dh);
+    octx.imageSmoothingEnabled = true;
+    octx.drawImage(crop, 0, 0, cw, ch, dx, dy, dw, dh);
 
-    return off.toDataURL("image/png").split(",")[1];
+    return out.toDataURL("image/png").split(",")[1];
   }
 
   async function recognizeWithGoogleVision() {
