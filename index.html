@@ -825,6 +825,7 @@ persistIfNeeded();
         ${unmarked.length ? `<div style="margin-top:10px;"><div class="muted">未标记对错的题：</div><ul class="list">${unmarked.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ``}
 
         ${buildFlagsSummary()}
+        ${buildManualCheckSummary()}
 
         <div class="row" style="margin-top:10px;">
           <button class="primary" id="retryMistakes">用错题再练一遍</button>
