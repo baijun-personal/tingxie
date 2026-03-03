@@ -244,6 +244,7 @@
     el.exitPractice.style.display = isPractice ? "inline-block" : "none";
     el.modePill.textContent = isPractice ? "模式：练习中" : "模式：准备";
     persistIfNeeded();
+    if (el.inputCard) el.inputCard.style.display = isPractice ? "none" : "block";
   }
 
   function setPills() {
