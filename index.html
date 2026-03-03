@@ -437,7 +437,7 @@ function segmentChinese(text) {
       padCtx.beginPath();
       const p = getPos(e);
       padCtx.moveTo(p.x, p.y);
-      e.preventDefault?.();
+      if (e && e.preventDefault) e.preventDefault();
     };
 
     const move = (e) => {
@@ -445,12 +445,12 @@ function segmentChinese(text) {
       const p = getPos(e);
       padCtx.lineTo(p.x, p.y);
       padCtx.stroke();
-      e.preventDefault?.();
+      if (e && e.preventDefault) e.preventDefault();
     };
 
     const end = (e) => {
       drawing = false;
-      e.preventDefault?.();
+      if (e && e.preventDefault) e.preventDefault();
     };
 
     el.pad.addEventListener("pointerdown", start);
@@ -576,7 +576,7 @@ function segmentChinese(text) {
       throw new Error(`Vision API error: ${res.status} ${txt}`);
     }
     const data = await res.json();
-    const text = data?.responses?.[0]?.textAnnotations?.[0]?.description || "";
+        const text = (data && data.responses && data.responses[0] && data.responses[0].textAnnotations && data.responses[0].textAnnotations[0] && data.responses[0].textAnnotations[0].description) ? data.responses[0].textAnnotations[0].description : "";
     return String(text).trim();
   }
 
@@ -964,7 +964,7 @@ persistIfNeeded();
     state.manualChecks = [];
     // also clear any UI remnants
     showCheckUI(false);
-    closeReviewModal?.();
+    if (typeof closeReviewModal === "function") closeReviewModal();
   }
 
     const payload = { state, ts: Date.now(), practice: document.body.classList.contains("practice") };
