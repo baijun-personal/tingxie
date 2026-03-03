@@ -183,6 +183,8 @@
     rateVal: $("rateVal"),
     pitchVal: $("pitchVal"),
     start: $("start"),
+    retryMistakes: $("retryMistakes"),
+    retryAll: $("retryAll"),
     previewBtn: $("previewBtn"),
     preview: $("preview"),
     resetAll: $("resetAll"),
@@ -993,7 +995,40 @@ persistIfNeeded();
     }
   }
 
-  function start() {
+  
+  function retryMistakes() {
+    // Re-run using only mistakes from this round
+    if (typeof restartWrongOnly === "function") return restartWrongOnly();
+    if (typeof restartMistakes === "function") return restartMistakes();
+    // fallback: if we have wrongList in state
+    if (Array.isArray(state.wrongs) && state.wrongs.length) {
+      state.items = state.wrongs.slice();
+      state.idx = 0;
+      state.done = false;
+      state.revealed = false;
+      renderQuestion();
+      setMode(true);
+      return;
+    }
+    // If no mistakes, just restart all
+    if (typeof retryAll === "function") return retryAll();
+    toast("没有错题可练");
+  }
+
+  function retryAll() {
+    if (typeof restartAll === "function") return restartAll();
+    if (typeof restartEverything === "function") return restartEverything();
+    // default: reset index and go again
+    state.idx = 0;
+    state.done = false;
+    state.revealed = false;
+    renderQuestion();
+    setMode(true);
+  }
+
+
+function start() {
+    resetReviewState();
     const text = normalizeText(el.input.value);
     if (!text) {
       alert("先粘贴一些中文内容。");
@@ -1044,6 +1079,8 @@ persistIfNeeded();
 
   // events
   el.start.addEventListener("click", start);
+  if (el.retryMistakes) el.retryMistakes.addEventListener("click", () => { resetReviewState(); retryMistakes(); });
+  if (el.retryAll) el.retryAll.addEventListener("click", () => { resetReviewState(); retryAll(); });
   el.previewBtn.addEventListener("click", preview);
   el.resetAll.addEventListener("click", resetAll);
 
