@@ -174,6 +174,12 @@
 
   const $ = (id) => document.getElementById(id);
 
+  function setInputCardVisible(show) {
+    const input = document.getElementById("inputCard");
+    if (input) input.style.display = show ? "block" : "none";
+  }
+
+
   const el = {
     modePill: $("modePill"),
     exitPractice: $("exitPractice"),
@@ -244,7 +250,7 @@
     el.exitPractice.style.display = isPractice ? "inline-block" : "none";
     el.modePill.textContent = isPractice ? "模式：练习中" : "模式：准备";
     persistIfNeeded();
-    if (el.inputCard) el.inputCard.style.display = isPractice ? "none" : "block";
+    setInputCardVisible(!isPractice);
   }
 
   function setPills() {
@@ -999,8 +1005,8 @@ persistIfNeeded();
     };
 
     el.summary.innerHTML = "";
-    if (el.inputCard) el.inputCard.style.display = \"none\";
     setMode(true);          // 关键：进入练习模式，隐藏输入区
+    setInputCardVisible(false);
     renderQuestion();
   }
 
@@ -1049,6 +1055,7 @@ persistIfNeeded();
   if (el.submitOCR) el.submitOCR.addEventListener("click", submitSpotCheck);
 if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatCheckAudio);
   if (el.skipCheck) el.skipCheck.addEventListener("click", () => {
+    setInputCardVisible(true);
     if (state.pendingCheck) {
       // record as skipped (ok=false) so parents see it
       state.flags = Array.isArray(state.flags) ? state.flags : [];
