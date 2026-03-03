@@ -879,16 +879,27 @@ persistIfNeeded();
   }
 
   function openReviewModal(item) {
-    el.reviewTitle.textContent = `需家长复核：第 ${item.idx + 1} 题`;
-    el.reviewMeta.textContent = `目标字：${item.targetChar}；识别：${item.gotChar || "（无）"}；原因：${item.reason || "识别不一致"}\n原句：${item.itemText}`;
-    el.reviewImg.src = item.img || "";
-    el.reviewModal.style.display = "flex";
+    const modal = document.getElementById("reviewModal");
+    const titleEl = document.getElementById("reviewTitle");
+    const metaEl = document.getElementById("reviewMeta");
+    const imgEl = document.getElementById("reviewImg");
+    if (!modal || !titleEl || !metaEl || !imgEl) {
+      toast("无法打开复核窗口（元素缺失）");
+      return;
+    }
+    titleEl.textContent = `需家长复核：第 ${item.idx + 1} 题`;
+    metaEl.textContent = `目标字：${item.targetChar}；识别：${item.gotChar || "（无）"}；原因：${item.reason || "识别不一致"}\n原句：${item.itemText}`;
+    imgEl.src = item.img || "";
+    modal.style.display = "flex";
   }
 
   function closeReviewModal() {
-    el.reviewModal.style.display = "none";
-    el.reviewImg.src = "";
+    const modal = document.getElementById("reviewModal");
+    const imgEl = document.getElementById("reviewImg");
+    if (modal) modal.style.display = "none";
+    if (imgEl) imgEl.src = "";
   }
+
 
   function buildManualCheckSummary() {
     const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
@@ -1094,6 +1105,22 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
 
   setPills();
   restoreIfNeeded();
+
+  // Close modal via button or clicking overlay
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!t) return;
+    if (t.id === "reviewClose") {
+      e.preventDefault();
+      closeReviewModal();
+      return;
+    }
+    const modal = document.getElementById("reviewModal");
+    if (modal && t === modal) {
+      closeReviewModal();
+    }
+  });
+
   renderQuestion();
 })();
 </script>
