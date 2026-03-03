@@ -886,7 +886,17 @@ persistIfNeeded();
     persistIfNeeded();
   }
 
-  function startWithMistakes() {
+    function clearReviewForNewRound() {
+    // Clear parent-review items so they don't carry over into the next round
+    state.pendingCheck = null;
+    state.flags = [];
+    state.manualChecks = [];
+    showCheckUI(false);
+    if (typeof closeReviewModal === "function") closeReviewModal();
+  }
+
+function startWithMistakes() {
+    clearReviewForNewRound();
     const wrongs = (state.results || []).filter(r => r && r.correct === false).map(r => r.text);
     const uniq = Array.from(new Set(wrongs));
     if (!uniq.length) {
@@ -897,6 +907,7 @@ persistIfNeeded();
   }
 
   function retryAll() {
+    clearReviewForNewRound();
     restartWithItems(state.items || []);
   }
 
