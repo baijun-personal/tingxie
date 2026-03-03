@@ -128,7 +128,7 @@
 
         <div class="row" style="margin-top:8px;">
           <button id="clearPad">清空手写板</button>
-          <button id="repeatCheckAudio">🔊 再听一次</button>
+          <button id="repeatCheckAudio">🔊 再听提示</button>
           <button class="primary" id="submitOCR">提交识别</button>
           <button id="skipCheck">跳过抽查</button>
         </div>
@@ -138,7 +138,7 @@
       </div>
 
       <div class="row" style="margin-top:10px;">
-        <button id="speakAgain" disabled>再听一次</button>
+        <button id="speakAgain" disabled>🔊 再听题目</button>
         <button class="primary" id="show" disabled>看答案</button>
         <button id="markRight" disabled>我写对了</button>
         <button id="markWrong" disabled>我写错了</button>
@@ -401,7 +401,7 @@ function segmentChinese(text) {
   function initPad() {
     if (!el.pad) return;
     padCtx = el.pad.getContext("2d");
-    padCtx.lineWidth = 14;
+    padCtx.lineWidth = 10;
     padCtx.lineCap = "round";
     padCtx.strokeStyle = "#000";
 
@@ -562,6 +562,9 @@ function segmentChinese(text) {
   function showCheckUI(show) {
     document.body.classList.toggle("checking", !!show);
     el.checkArea.style.display = show ? "block" : "none";
+    // Prevent skipping: disable marking buttons during spot-check
+    if (el.markRight) el.markRight.disabled = !!show;
+    if (el.markWrong) el.markWrong.disabled = !!show;
     if (!show) {
       el.checkPrompt.textContent = "";
       el.ocrResult.textContent = "";
@@ -726,8 +729,10 @@ function segmentChinese(text) {
 
     el.speakAgain.disabled = done ? true : false;
     el.show.disabled = done ? true : state.revealed;
-    el.markRight.disabled = done ? true : !state.revealed;
-    el.markWrong.disabled = done ? true : !state.revealed;
+    // During spot-check, keep buttons disabled so child cannot skip.
+    const checking = !!state.pendingCheck;
+    el.markRight.disabled = checking ? true : (done ? true : !state.revealed);
+    el.markWrong.disabled = checking ? true : (done ? true : !state.revealed);
 
     // spot-check UI: default hidden unless pending
     if (!state.pendingCheck) {
@@ -824,7 +829,7 @@ persistIfNeeded();
         ${wrongs.length ? `<div style="margin-top:10px;"><div class="muted">错题（建议再练）：</div><ul class="list">${wrongs.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : `<div style="margin-top:10px;" class="ok">没有错题 ✅</div>`}
         ${unmarked.length ? `<div style="margin-top:10px;"><div class="muted">未标记对错的题：</div><ul class="list">${unmarked.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ``}
 
-        ${buildFlagsSummary()}
+        
         ${buildManualCheckSummary()}
 
         <div class="row" style="margin-top:10px;">
@@ -915,26 +920,23 @@ persistIfNeeded();
   }
 
 
-  function buildFlagsSummary() {
-    const flags = Array.isArray(state.flags) ? state.flags : [];
-    const bad = flags.filter(f => f && f.ok === false);
-    if (!bad.length) return `<div style="margin-top:10px;" class="ok">抽查记录：无异常 ✅</div>`;
-    const rows = bad.slice(-50).map(f => {
-      const q = `第 ${Number(f.idx) + 1} 题`;
-      const tgt = escapeHtml(f.targetChar || "");
-      const got = escapeHtml(f.gotChar || "");
-      const txt = escapeHtml(f.itemText || "");
-      return `<li>${q}：抽查“${tgt}” → 识别“${got}” （${txt}）</li>`;
-    }).join("");
-    return `<div style="margin-top:10px;"><div class="muted">抽查异常（供家长复核，最多显示最近 50 条）：</div><ul class="list">${rows}</ul></div>`;
-  }
-
+  
 
   function persistIfNeeded() {
     if (!el.remember.checked) {
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_TEXT);      return;
     }
+
+  function resetReviewState() {
+    state.pendingCheck = null;
+    state.flags = [];
+    state.manualChecks = [];
+    // also clear any UI remnants
+    showCheckUI(false);
+    closeReviewModal?.();
+  }
+
     const payload = { state, ts: Date.now(), practice: document.body.classList.contains("practice") };
     localStorage.setItem(LS_KEY, JSON.stringify(payload));
     localStorage.setItem(LS_TEXT, el.input.value || "");  }
