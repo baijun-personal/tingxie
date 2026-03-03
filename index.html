@@ -999,6 +999,7 @@ persistIfNeeded();
     };
 
     el.summary.innerHTML = "";
+    if (el.inputCard) el.inputCard.style.display = \"none\";
     setMode(true);          // 关键：进入练习模式，隐藏输入区
     renderQuestion();
   }
