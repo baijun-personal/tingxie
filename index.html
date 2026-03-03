@@ -107,7 +107,7 @@
           <span id="score" class="pill">正确率：-</span>
           <span id="marked" class="pill" style="display:none;"></span>
         </div>
-        <div class="muted">提示：点击“我写对了”时有 20% 概率触发抽查：请在下方手写板写指定的一个字并提交识别（用于家长复核）</div>
+        <div class="muted">
       </div>
 
       <div style="margin-top:10px;">
@@ -119,11 +119,11 @@
       <div style="margin-top:12px; display:none;" id="checkArea">
         <div class="row" style="justify-content:space-between;">
           <div id="checkPrompt" class="pill"></div>
-          <div class="muted" id="checkNote">请手写一个字，然后提交识别</div>
+          <div class="muted" id="checkNote">只写一个字，写大一点（尽量居中），然后提交识别</div>
         </div>
 
         <div style="margin-top:8px;">
-          <canvas id="pad" width="420" height="420" style="border:1px solid #ccc;border-radius:12px;background:#fff;touch-action:none;"></canvas>
+          <canvas id="pad" width="294" height="294" style="border:1px solid #ccc;border-radius:12px;background:#fff;touch-action:none;"></canvas>
         </div>
 
         <div class="row" style="margin-top:8px;">
@@ -457,7 +457,7 @@ function segmentChinese(text) {
     const body = {
       requests: [{
         image: { content: padToBase64() },
-        features: [{ type: "DOCUMENT_TEXT_DETECTION" }]
+        features: [{ type: "TEXT_DETECTION" }]
       }]
     };
 
@@ -526,11 +526,13 @@ function segmentChinese(text) {
       return;
     }
 
-    const got = firstHanChar(recognized);
     const expected = state.pendingCheck.targetChar;
-    const ok = got === expected;
+    const gotFirst = firstHanChar(recognized);
+    const hanAll = (recognized || "").match(/[\u4E00-\u9FFF]/g) || [];
+    const ok = (gotFirst === expected) || hanAll.includes(expected);
+    const got = gotFirst || (hanAll[0] || "");
 
-    el.ocrResult.textContent = `识别：${got || "（无汉字）"}；目标：${expected}；${ok ? "通过 ✅" : "不通过 ❌"}`;
+    el.ocrResult.textContent = `识别：${got || "（无汉字）"}；目标：${expected}；${ok ? "通过 ✅" : "不通过 ❌"}；原始：${(recognized || "").replace(/\s+/g, " ").slice(0, 30)}`;
 
     // Record flag for parents review (only record failures or all? record all with ok flag)
     state.flags = Array.isArray(state.flags) ? state.flags : [];
