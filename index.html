@@ -930,13 +930,20 @@ persistIfNeeded();
   function buildManualCheckSummary() {
     const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
     if (!arr.length) return ``;
+
+    // Show the latest 50, but keep absolute indices so clicks always open the correct item.
     const slice = arr.slice(-50);
-    const items = slice.map((it, i) => {
-      const label = `第 ${it.idx + 1} 题：抽查“${it.targetChar}”`;
-      // store index into slice (from newest to oldest)
-      const idx = slice.length - 1 - i;
-      return `<li><a href="javascript:void(0)" class="reviewLink" data-review-idx="${idx}">${escapeHtml(label)}</a></li>`;
-    }).join("");
+    const base = arr.length - slice.length;
+
+    // Render newest first for convenience
+    const items = slice.map((it, i) => ({ it, abs: base + i }))
+      .reverse()
+      .map(({ it, abs }) => {
+        const label = `第 ${it.idx + 1} 题：抽查“${it.targetChar}”`;
+        return `<li><a href="javascript:void(0)" class="reviewLink" data-review-abs="${abs}">${escapeHtml(label)}</a></li>`;
+      })
+      .join("");
+
     return `<div style="margin-top:10px;"><div class="muted">需家长复核（点击查看手写，最多显示最近 50 条）：</div><ul class="list">${items}</ul></div>`;
   }
 
@@ -1102,8 +1109,7 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
     const a = e.target && e.target.closest ? e.target.closest(".reviewLink") : null;
     if (!a) return;
     e.preventDefault();
-    const full = Array.isArray(state.manualChecks) ? state.manualChecks : [];
-    const slice = full.slice(-50);
+    const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
     const idx = Number(a.getAttribute("data-review-idx"));
     const item = slice[idx];
     if (item) openReviewModal(item);
@@ -1121,8 +1127,8 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
 
     const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
     const slice = arr.slice(-50);
-    const idx = Number(link.getAttribute("data-review-idx"));
-    const item = slice[idx];
+    const abs = Number(link.getAttribute("data-review-abs"));
+    const item = arr[abs];
     if (item) openReviewModal(item);
   }, true);
 
