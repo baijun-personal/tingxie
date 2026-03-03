@@ -46,16 +46,8 @@
     }
     #toast.show { opacity: 1; }
   
-    /* 准备模式：隐藏练习区（未开始新一轮前不显示右侧） */
+    /* 准备模式：未开始练习时隐藏练习区 */
     body:not(.practice) #practiceCard { display: none; }
-
-    /* 强制“当前内容”区域始终换行到下一行 */
-    #currentContentWrap {
-      flex-basis: 100% !important;
-      width: 100% !important;
-      margin-top: 8px;
-    }
-
 </style>
 </head>
 <body>
@@ -76,7 +68,6 @@
         <div>
           <div>1) 粘贴内容（词、短语、句子都可以）</div>
           <div class="muted">会自动按句末标点切分（，。？！；等），每一段作为一题</div>
-</div>
         </div>
         <label class="muted">
           <input id="remember" type="checkbox" checked />
@@ -123,7 +114,7 @@
       </div>
 
       <div style="margin-top:10px;">
-        <div id="currentContentWrap"><div class="muted">当前内容（默认隐藏）</div>
+        <div class="muted">当前内容（默认隐藏）</div>
         <div id="answer" class="big hiddenAnswer">——</div>
         <div id="answerPinyin" class="pinyin" style="display:none;"></div>
       </div>
@@ -173,12 +164,6 @@
   const GOOGLE_VISION_API_KEY = "AIzaSyA63xV0MbwPf5nfTttpl_FHOAYnpTymPfM";
 
   const $ = (id) => document.getElementById(id);
-
-  function setInputCardVisible(show) {
-    const input = document.getElementById("inputCard");
-    if (input) input.style.display = show ? "block" : "none";
-  }
-
 
   const el = {
     modePill: $("modePill"),
@@ -250,7 +235,6 @@
     el.exitPractice.style.display = isPractice ? "inline-block" : "none";
     el.modePill.textContent = isPractice ? "模式：练习中" : "模式：准备";
     persistIfNeeded();
-    setInputCardVisible(!isPractice);
   }
 
   function setPills() {
@@ -1006,7 +990,6 @@ persistIfNeeded();
 
     el.summary.innerHTML = "";
     setMode(true);          // 关键：进入练习模式，隐藏输入区
-    setInputCardVisible(false);
     renderQuestion();
   }
 
@@ -1055,7 +1038,6 @@ persistIfNeeded();
   if (el.submitOCR) el.submitOCR.addEventListener("click", submitSpotCheck);
 if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatCheckAudio);
   if (el.skipCheck) el.skipCheck.addEventListener("click", () => {
-    setInputCardVisible(true);
     if (state.pendingCheck) {
       // record as skipped (ok=false) so parents see it
       state.flags = Array.isArray(state.flags) ? state.flags : [];
