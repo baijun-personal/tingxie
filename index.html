@@ -879,30 +879,13 @@ persistIfNeeded();
   }
 
   function openReviewModal(item) {
-    // Lazy-get modal elements (in case script ran before modal HTML exists)
-    const modal = document.getElementById("reviewModal");
-    const closeBtn = document.getElementById("reviewClose");
-    const titleEl = document.getElementById("reviewTitle");
-    const metaEl = document.getElementById("reviewMeta");
-    const imgEl = document.getElementById("reviewImg");
-    if (!modal || !titleEl || !metaEl || !imgEl) {
-      toast("无法打开复核窗口（页面元素缺失）");
-      return;
-    }
-    titleEl.textContent = `需家长复核：第 ${item.idx + 1} 题`;
-    metaEl.textContent = `目标字：${item.targetChar}；识别：${item.gotChar || "（无）"}；原因：${item.reason || "识别不一致"}\n原句：${item.itemText}`;
-    imgEl.src = item.img || "";
-    modal.style.display = "flex";
+    el.reviewTitle.textContent = `需家长复核：第 ${item.idx + 1} 题`;
+    el.reviewMeta.textContent = `目标字：${item.targetChar}；识别：${item.gotChar || "（无）"}；原因：${item.reason || "识别不一致"}\n原句：${item.itemText}`;
+    el.reviewImg.src = item.img || "";
+    el.reviewModal.style.display = "flex";
   }
 
   function closeReviewModal() {
-    const modal = document.getElementById("reviewModal");
-    const imgEl = document.getElementById("reviewImg");
-    if (modal) modal.style.display = "none";
-    if (imgEl) imgEl.src = "";
-  }
-
-() {
     el.reviewModal.style.display = "none";
     el.reviewImg.src = "";
   }
@@ -915,7 +898,7 @@ persistIfNeeded();
       const label = `第 ${it.idx + 1} 题：抽查“${it.targetChar}”`;
       // store index into slice (from newest to oldest)
       const idx = slice.length - 1 - i;
-      return `<li><a href="#" class="reviewLink" data-review-idx="${idx}">${escapeHtml(label)}</a></li>`;
+      return `<li><a href="javascript:void(0)" class="reviewLink" data-review-idx="${idx}">${escapeHtml(label)}</a></li>`;
     }).join("");
     return `<div style="margin-top:10px;"><div class="muted">需家长复核（点击查看手写，最多显示最近 50 条）：</div><ul class="list">${items}</ul></div>`;
   }
@@ -1074,37 +1057,6 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
 
   initPad();
 
-  // manual review modal events (lazy bindings)
-  document.addEventListener("click", (e) => {
-    const tgt = e.target;
-
-    // Close modal
-    if (tgt && tgt.id === "reviewClose") {
-      e.preventDefault();
-      closeReviewModal();
-      return;
-    }
-
-    // Click outside modal content closes modal
-    const modal = document.getElementById("reviewModal");
-    if (modal && tgt === modal) {
-      closeReviewModal();
-      return;
-    }
-
-    // Review link/button
-    const btn = tgt && tgt.closest ? tgt.closest(".reviewLink") : null;
-    if (!btn) return;
-
-    e.preventDefault();
-    const full = Array.isArray(state.manualChecks) ? state.manualChecks : [];
-    const slice = full.slice(-50);
-    const idx = Number(btn.getAttribute("data-review-idx"));
-    const item = slice[idx];
-    if (item) openReviewModal(item);
-  });
-
-
   // manual review modal events
   if (el.reviewClose) el.reviewClose.addEventListener("click", closeReviewModal);
   if (el.reviewModal) el.reviewModal.addEventListener("click", (e) => {
@@ -1123,6 +1075,22 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
     if (item) openReviewModal(item);
   });
 
+
+
+  // Robust capture-phase handler for manual review links (prevents default navigation reliably)
+  document.addEventListener("click", (e) => {
+    const tgt = e.target;
+    const link = tgt && tgt.closest ? tgt.closest(".reviewLink") : null;
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
+    const slice = arr.slice(-50);
+    const idx = Number(link.getAttribute("data-review-idx"));
+    const item = slice[idx];
+    if (item) openReviewModal(item);
+  }, true);
 
   setPills();
   restoreIfNeeded();
