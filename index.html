@@ -437,7 +437,7 @@ function segmentChinese(text) {
       padCtx.beginPath();
       const p = getPos(e);
       padCtx.moveTo(p.x, p.y);
-      if (e && e.preventDefault) e.preventDefault();
+      e.preventDefault?.();
     };
 
     const move = (e) => {
@@ -445,12 +445,12 @@ function segmentChinese(text) {
       const p = getPos(e);
       padCtx.lineTo(p.x, p.y);
       padCtx.stroke();
-      if (e && e.preventDefault) e.preventDefault();
+      e.preventDefault?.();
     };
 
     const end = (e) => {
       drawing = false;
-      if (e && e.preventDefault) e.preventDefault();
+      e.preventDefault?.();
     };
 
     el.pad.addEventListener("pointerdown", start);
@@ -576,7 +576,7 @@ function segmentChinese(text) {
       throw new Error(`Vision API error: ${res.status} ${txt}`);
     }
     const data = await res.json();
-        const text = (data && data.responses && data.responses[0] && data.responses[0].textAnnotations && data.responses[0].textAnnotations[0] && data.responses[0].textAnnotations[0].description) ? data.responses[0].textAnnotations[0].description : "";
+    const text = data?.responses?.[0]?.textAnnotations?.[0]?.description || "";
     return String(text).trim();
   }
 
@@ -887,7 +887,6 @@ persistIfNeeded();
   }
 
   function startWithMistakes() {
-    resetReviewState();
     const wrongs = (state.results || []).filter(r => r && r.correct === false).map(r => r.text);
     const uniq = Array.from(new Set(wrongs));
     if (!uniq.length) {
@@ -898,7 +897,6 @@ persistIfNeeded();
   }
 
   function retryAll() {
-    resetReviewState();
     restartWithItems(state.items || []);
   }
 
@@ -964,7 +962,7 @@ persistIfNeeded();
     state.manualChecks = [];
     // also clear any UI remnants
     showCheckUI(false);
-    if (typeof closeReviewModal === "function") closeReviewModal();
+    closeReviewModal?.();
   }
 
     const payload = { state, ts: Date.now(), practice: document.body.classList.contains("practice") };
@@ -996,7 +994,6 @@ persistIfNeeded();
   }
 
   function start() {
-    resetReviewState();
     const text = normalizeText(el.input.value);
     if (!text) {
       alert("先粘贴一些中文内容。");
