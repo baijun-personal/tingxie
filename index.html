@@ -73,6 +73,11 @@
           <input id="remember" type="checkbox" checked />
           记住内容与进度
         </label>
+        <label class="muted" style="margin-left:12px;display:flex;align-items:center;gap:6px;">
+          抽查概率
+          <input id="spotProb" type="number" min="0" max="100" step="5" value="25" style="width:64px;" />
+          %
+        </label>
       </div>
 
       <textarea id="input" placeholder="例：我喜欢秋天的风。落叶飘过幽径，黄昏染上长亭。&#10;也可以直接一行一个词：&#10;落叶&#10;黄昏&#10;幽径"></textarea>
@@ -110,7 +115,7 @@
           <span id="score" class="pill">正确率：-</span>
           <span id="marked" class="pill" style="display:none;"></span>
         </div>
-        <div class="muted">
+        <div class="muted"></div>
       </div>
 
       <div style="margin-top:10px;">
@@ -172,6 +177,7 @@
 
     input: $("input"),
     remember: $("remember"),
+    spotProb: $("spotProb"),
         rate: $("rate"),
     pitch: $("pitch"),
     rateVal: $("rateVal"),
@@ -229,6 +235,18 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.toast.classList.remove("show"), 900);
   }
+
+  function getSpotProb() {
+    const v = Number(localStorage.getItem("spotProbPct") || "25");
+    if (Number.isFinite(v)) return Math.max(0, Math.min(100, v)) / 100;
+    return 0.25;
+  }
+
+  function setSpotProbPct(pct) {
+    const v = Math.max(0, Math.min(100, Number(pct) || 0));
+    localStorage.setItem("spotProbPct", String(v));
+  }
+
 
   function setMode(isPractice) {
     document.body.classList.toggle("practice", !!isPractice);
@@ -576,8 +594,8 @@ function segmentChinese(text) {
   }
 
   async function maybeTriggerSpotCheckOnMarkRight() {
-    // 20% chance
-    if (Math.random() >= 0.2) return false;
+    // configurable probability (default 25%)
+    if (Math.random() >= getSpotProb()) return false;
 
     const itemText = currentText();
     const picked = await pickMostStrokesChar(itemText);
