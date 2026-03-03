@@ -128,6 +128,7 @@
 
         <div class="row" style="margin-top:8px;">
           <button id="clearPad">清空手写板</button>
+          <button id="repeatCheckAudio">🔊 再听一次</button>
           <button class="primary" id="submitOCR">提交识别</button>
           <button id="skipCheck">跳过抽查</button>
         </div>
@@ -194,6 +195,7 @@
     checkNote: $("checkNote"),
     pad: $("pad"),
     clearPad: $("clearPad"),
+    repeatCheckAudio: $("repeatCheckAudio"),
     submitOCR: $("submitOCR"),
     skipCheck: $("skipCheck"),
     ocrResult: $("ocrResult"),
@@ -493,13 +495,20 @@ function segmentChinese(text) {
     if (!picked || !picked.ch) return false;
 
     state.pendingCheck = { targetChar: picked.ch, itemText, reason: `最多笔画（约 ${picked.strokes} 画）` };
-    el.checkPrompt.textContent = `抽查：请写 “${picked.ch}”`;
+    el.checkPrompt.textContent = "抽查：请写（听语音提示）";
+    // 语音提示要写的字（不在屏幕上显示，避免直接抄）
+    speak(`请写${picked.ch}`);
     el.checkNote.textContent = `规则：从本题里选笔画最多的前 2 个字中随机抽 1 个（${picked.strokes || "?"} 画）`;
     el.ocrResult.textContent = "";
     showCheckUI(true);
     toast("触发抽查：请手写一个字");
     persistIfNeeded();
     return true;
+  }
+
+  function repeatCheckAudio() {
+    if (!state.pendingCheck) return;
+    speak(`请写${state.pendingCheck.targetChar}`);
   }
 
   async function submitSpotCheck() {
@@ -883,6 +892,7 @@ persistIfNeeded();
 
   // spot-check events
   if (el.submitOCR) el.submitOCR.addEventListener("click", submitSpotCheck);
+if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatCheckAudio);
   if (el.skipCheck) el.skipCheck.addEventListener("click", () => {
     if (state.pendingCheck) {
       // record as skipped (ok=false) so parents see it
