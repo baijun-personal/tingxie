@@ -168,7 +168,8 @@
   <div id="toast"></div>
 
   <!-- 拼音库：只用来把汉字转拼音 -->
-  
+  <script src="https://unpkg.com/pinyin-pro@3.27.0/dist/index.js"></script>
+
 <script id="strokeCountData" type="application/json">
 {
   "1": "一乙",
@@ -201,8 +202,6 @@
   "36": "齉"
 }
 </script>
-<script src="https://unpkg.com/pinyin-pro@3.27.0/dist/index.js"></script>
-
 <script>
 (() => {
   // =========================
@@ -401,26 +400,26 @@ function segmentChinese(text) {
   const STROKE_CACHE_KEY = "tingxie_v3_stroke_cache";
   let strokeCache = {};
 
-  // Offline stroke-count map (built from embedded stroke-count.json)
+  // Offline stroke-count map (embedded as JSON in <script id="strokeCountData">)
   let strokeMap = null;
   function initStrokeMap() {
     if (strokeMap) return strokeMap;
     strokeMap = {};
     try {
-      const raw = (document.getElementById("strokeCountData") && document.getElementById("strokeCountData").textContent) || "";
-      const data = JSON.parse(raw);
-      // data format: { "1": "一乙...", "2": "二十...", ... }
-      Object.keys(data).forEach(k => {
+      const elData = document.getElementById("strokeCountData");
+      const raw = elData ? elData.textContent : "";
+      const data = JSON.parse(raw || "{}");
+      // Format: { "1": "一乙...", "2": "二十...", ... }
+      for (const k of Object.keys(data)) {
         const n = Number(k);
         const str = String(data[k] || "");
         for (const ch of str) strokeMap[ch] = n;
-      });
+      }
     } catch (e) {
       strokeMap = {};
     }
     return strokeMap;
   }
-
 
   try { strokeCache = JSON.parse(localStorage.getItem(STROKE_CACHE_KEY) || "{}") || {}; } catch (e) { strokeCache = {}; }
 
@@ -429,14 +428,15 @@ function segmentChinese(text) {
   // CCDB (hemiola) provides kTotalStrokes / stroke_count via web API (free)
   async function fetchStrokeCount(ch) {
     if (!ch) return 0;
-    // 1) Offline map first
+
+    // 1) Offline map first (fast, no network)
     const m = initStrokeMap();
     if (m && m[ch]) return Number(m[ch]) || 0;
 
     // 2) Local cache next
     if (strokeCache && strokeCache[ch]) return Number(strokeCache[ch]) || 0;
 
-    // 3) Optional: online fallback (can fail due to CORS). Keep it best-effort.
+    // 3) Optional online fallback (best effort)
     try {
       const url = `https://ccdb.hemiola.com/characters/string/${encodeURIComponent(ch)}?fields=stroke_count,kTotalStrokes`;
       const resp = await fetch(url, { method: "GET" });
@@ -446,24 +446,11 @@ function segmentChinese(text) {
       const n = Number((item && item.stroke_count) || (item && item.kTotalStrokes) || 0);
       if (n > 0) {
         strokeCache[ch] = n;
-        saveStrokeCache();
+        try { localStorage.setItem(STROKE_CACHE_KEY, JSON.stringify(strokeCache)); } catch (_) {}
         return n;
       }
     } catch (e) {}
     return 0;
-  }
-      }
-
-      // Fallback: unknown -> 0
-      strokeCache[ch] = Number.isFinite(n) ? n : 0;
-      localStorage.setItem(STROKE_CACHE_KEY, JSON.stringify(strokeCache));
-      return strokeCache[ch];
-    } catch (e) {
-      // Network issue: don't block; mark as unknown (0) so selection still works
-      strokeCache[ch] = 0;
-      try { localStorage.setItem(STROKE_CACHE_KEY, JSON.stringify(strokeCache)); } catch (_) {}
-      return 0;
-    }
   }
 
   async function pickMostStrokesChar(text) {
