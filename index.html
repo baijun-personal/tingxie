@@ -364,69 +364,15 @@ function segmentChinese(text) {
   // Last prepared OCR image (dataURL) for manual review
   let lastOcrPreparedDataUrl = "";
 
-  // Cache stroke counts in memory + localStorage (no key needed)
-  const STROKE_CACHE_KEY = "tingxie_v3_stroke_cache";
-  let strokeCache = {};
-  try { strokeCache = JSON.parse(localStorage.getItem(STROKE_CACHE_KEY) || "{}") || {}; } catch (e) { strokeCache = {}; }
 
-  function isHan(ch) { return /[\u4E00-\u9FFF]/.test(ch); }
+function isHan(ch) { return /[\u4E00-\u9FFF]/.test(ch); }
 
-  // CCDB (hemiola) provides kTotalStrokes / stroke_count via web API (free)
-  async function fetchStrokeCount(ch) {
-    if (!isHan(ch)) return 0;
-    if (strokeCache[ch] != null) return strokeCache[ch];
-
-    // Try CCDB endpoint
-    // Example docs: http://ccdb.hemiola.com/
-    const url = `https://ccdb.hemiola.com/characters/string/${encodeURIComponent(ch)}?fields=stroke_count,kTotalStrokes`;
-    try {
-      const res = await fetch(url, { method: "GET" });
-      if (!res.ok) throw new Error("ccdb http " + res.status);
-      const data = await res.json();
-
-      // data is array of character objects
-      const obj = Array.isArray(data) ? data[0] : null;
-      // stroke_count may exist; kTotalStrokes may be like "12" or "12,13"
-      let n = 0;
-      if (obj) {
-        if (typeof obj.stroke_count === "number") n = obj.stroke_count;
-        else if (typeof obj.stroke_count === "string") n = parseInt(obj.stroke_count, 10) || 0;
-
-        if (!n && typeof obj.kTotalStrokes === "string") {
-          const parts = obj.kTotalStrokes.split(/\s*,\s*/).map(x => parseInt(x, 10)).filter(x => Number.isFinite(x));
-          if (parts.length) n = Math.max(...parts);
-        }
-      }
-
-      // Fallback: unknown -> 0
-      strokeCache[ch] = Number.isFinite(n) ? n : 0;
-      localStorage.setItem(STROKE_CACHE_KEY, JSON.stringify(strokeCache));
-      return strokeCache[ch];
-    } catch (e) {
-      // Network issue: don't block; mark as unknown (0) so selection still works
-      strokeCache[ch] = 0;
-      try { localStorage.setItem(STROKE_CACHE_KEY, JSON.stringify(strokeCache)); } catch (_) {}
-      return 0;
-    }
-  }
-
-  async function pickMostStrokesChar(text) {
-    const chars = Array.from(text).filter(isHan);
-    if (!chars.length) return null;
-
-    // Evaluate unique chars to reduce API calls
-    const uniq = Array.from(new Set(chars));
-    const pairs = await Promise.all(uniq.map(async ch => [ch, await fetchStrokeCount(ch)]));
-
-    // Sort desc by strokes
-    pairs.sort((a, b) => (b[1] || 0) - (a[1] || 0));
-
-    // Choose randomly among the top 2 candidates (or fewer if not enough)
-    const top = pairs.slice(0, Math.min(2, pairs.length));
-    const pick = top[Math.floor(Math.random() * top.length)];
-
-    return { ch: pick[0], strokes: pick[1] || 0, candidates: top };
-  }
+// 抽查选字规则：从所有题目里随机抽 1 题，再从该题里随机抽 1 个汉字
+function pickRandomHanChar(text) {
+  const chars = Array.from(text || "").filter(isHan);
+  if (!chars.length) return null;
+  return chars[Math.floor(Math.random() * chars.length)];
+}
 
   function firstHanChar(s) {
     const m = (s || "").match(/[\u4E00-\u9FFF]/);
@@ -611,32 +557,35 @@ function segmentChinese(text) {
     }
   }
 
-  async function maybeTriggerSpotCheckOnMarkRight() {
-    // configurable probability (default 25%)
-    if (Math.random() >= getSpotProb()) return false;
+  
+async function maybeTriggerSpotCheckOnMarkRight() {
+  // configurable probability (default 25%)
+  if (Math.random() >= getSpotProb()) return false;
 
-    const itemText = currentText();
-    const picked = await pickMostStrokesChar(itemText);
-    if (!picked || !picked.ch) return false;
+  const itemText = currentItem();
+  if (!itemText) return false;
+  const ch = pickRandomHanChar(itemText);
+  if (!ch) return false;
 
-    state.pendingCheck = { targetChar: picked.ch, itemText, reason: `最多笔画（约 ${picked.strokes} 画）` };
-    el.checkPrompt.textContent = "抽查：请写（听语音提示）";
-    // 语音提示要写的字（不在屏幕上显示，避免直接抄）
-    speak(`请写${picked.ch}`);
-    el.checkNote.textContent = `规则：从本题里选笔画最多的前 2 个字中随机抽 1 个（${picked.strokes || "?"} 画）`;
-    el.ocrResult.textContent = "";
-    // avoid accidental taps selecting text on mobile
-    lockTap(260);
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    // delay showing UI so finger can leave the button
-    setTimeout(() => {
-      showCheckUI(true);
-      try { el.checkArea.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
-    }, 180);
-    toast("触发抽查：请手写一个字");
-    persistIfNeeded();
-    return true;
-  }
+  state.pendingCheck = { targetChar: ch, itemText, reason: "随机抽取题目与字" };
+  el.checkPrompt.textContent = "抽查：请写（听语音提示）";
+  // 语音提示要写的字（不在屏幕上显示，避免直接抄）
+  speak(`请写${ch}`);
+  el.checkNote.textContent = "规则：从当前句子中随机抽 1 个汉字进行抽查";
+  el.ocrResult.textContent = "";
+  // avoid accidental taps selecting text on mobile
+  lockTap(260);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  // delay showing UI so finger can leave the button
+  setTimeout(() => {
+    showCheckUI(true);
+    try { el.checkArea.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
+  }, 180);
+  toast("触发抽查：请手写一个字");
+  persistIfNeeded();
+  return true;
+}
+
 
   function repeatCheckAudio() {
     if (!state.pendingCheck) return;
