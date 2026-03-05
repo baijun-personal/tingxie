@@ -48,6 +48,13 @@
   
     /* 准备模式：未开始练习时隐藏练习区 */
     body:not(.practice) #practiceCard { display: none; }
+
+    /* 防止手机上长按/误触导致文字被选中 */
+    button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #practiceCard { -webkit-user-select: none; user-select: none; }
+    body.locktap #practiceCard { pointer-events: none; }
+    body.locktap #checkArea { pointer-events: auto; }
+
 </style>
 </head>
 <body>
@@ -236,6 +243,12 @@
     toastTimer = setTimeout(() => el.toast.classList.remove("show"), 900);
   }
 
+  function lockTap(ms = 220) {
+    document.body.classList.add("locktap");
+    setTimeout(() => document.body.classList.remove("locktap"), ms);
+  }
+
+
   function getSpotProb() {
     const v = Number(localStorage.getItem("spotProbPct") || "25");
     if (Number.isFinite(v)) return Math.max(0, Math.min(100, v)) / 100;
@@ -246,6 +259,9 @@
     const v = Math.max(0, Math.min(100, Number(pct) || 0));
     localStorage.setItem("spotProbPct", String(v));
   }
+
+  // ensure default spot-check probability exists
+  if (localStorage.getItem("spotProbPct") == null) setSpotProbPct(25);
 
 
   function setMode(isPractice) {
@@ -607,7 +623,14 @@ function segmentChinese(text) {
     speak(`请写${picked.ch}`);
     el.checkNote.textContent = `规则：从本题里选笔画最多的前 2 个字中随机抽 1 个（${picked.strokes || "?"} 画）`;
     el.ocrResult.textContent = "";
-    showCheckUI(true);
+    // avoid accidental taps selecting text on mobile
+    lockTap(260);
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    // delay showing UI so finger can leave the button
+    setTimeout(() => {
+      showCheckUI(true);
+      try { el.checkArea.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
+    }, 180);
     toast("触发抽查：请手写一个字");
     persistIfNeeded();
     return true;
@@ -1063,12 +1086,26 @@ function startWithMistakes() {
   el.speakAgain.addEventListener("click", () => speak(currentText()));
   el.show.addEventListener("click", showAnswer);
 
-  el.markRight.addEventListener("pointerup", () => mark(true));
-  el.markWrong.addEventListener("pointerup", () => mark(false));
+  // Prevent accidental selection/extra tap on mobile
+  el.markRight.addEventListener("pointerdown", (e) => { e.preventDefault(); lockTap(180); });
+  el.markWrong.addEventListener("pointerdown", (e) => { e.preventDefault(); lockTap(180); });
+  el.markRight.addEventListener("click", () => mark(true));
+  el.markWrong.addEventListener("click", () => mark(false));
 
   el.rate.addEventListener("input", () => { setPills(); persistIfNeeded(); });
   el.pitch.addEventListener("input", () => { setPills(); persistIfNeeded(); });
   el.remember.addEventListener("change", persistIfNeeded);
+
+  // spot-check probability control (0-100), persisted in localStorage
+  if (el.spotProb) {
+    const savedPct = Number(localStorage.getItem("spotProbPct") || "25");
+    el.spotProb.value = String(Number.isFinite(savedPct) ? savedPct : 25);
+    el.spotProb.addEventListener("change", () => {
+      setSpotProbPct(el.spotProb.value);
+      toast(`抽查概率：${Math.max(0, Math.min(100, Number(el.spotProb.value) || 0))}%`);
+    });
+  }
+
 
   // spot-check events
   if (el.submitOCR) el.submitOCR.addEventListener("click", submitSpotCheck);
