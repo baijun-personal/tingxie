@@ -395,11 +395,7 @@ function segmentChinese(text) {
 
   // Last prepared OCR image (dataURL) for manual review
   let lastOcrPreparedDataUrl = "";
-
-  // Cache stroke counts in memory + localStorage (no key needed)
-  const STROKE_CACHE_KEY = "tingxie_v3_stroke_cache";
-  let strokeCache = {};
-
+  // Offline stroke-count map (embedded as JSON in <script id="strokeCountData">)
   // Offline stroke-count map (embedded as JSON in <script id="strokeCountData">)
   let strokeMap = null;
   function initStrokeMap() {
@@ -421,55 +417,30 @@ function segmentChinese(text) {
     return strokeMap;
   }
 
-  try { strokeCache = JSON.parse(localStorage.getItem(STROKE_CACHE_KEY) || "{}") || {}; } catch (e) { strokeCache = {}; }
-
   function isHan(ch) { return /[\u4E00-\u9FFF]/.test(ch); }
+  function fetchStrokeCount(ch) {
+  if (!ch) return 0;
+  const m = initStrokeMap();
+  return (m && m[ch]) ? (Number(m[ch]) || 0) : 0;
+}
 
-  // CCDB (hemiola) provides kTotalStrokes / stroke_count via web API (free)
-  async function fetchStrokeCount(ch) {
-    if (!ch) return 0;
+  function pickMostStrokesChar(text) {
+  const chars = Array.from(text).filter(isHan);
+  if (!chars.length) return null;
 
-    // 1) Offline map first (fast, no network)
-    const m = initStrokeMap();
-    if (m && m[ch]) return Number(m[ch]) || 0;
+  // Evaluate unique chars to avoid repeated work
+  const uniq = Array.from(new Set(chars));
+  const pairs = uniq.map(ch => [ch, fetchStrokeCount(ch)]);
 
-    // 2) Local cache next
-    if (strokeCache && strokeCache[ch]) return Number(strokeCache[ch]) || 0;
+  // Sort desc by strokes
+  pairs.sort((a, b) => (b[1] || 0) - (a[1] || 0));
 
-    // 3) Optional online fallback (best effort)
-    try {
-      const url = `https://ccdb.hemiola.com/characters/string/${encodeURIComponent(ch)}?fields=stroke_count,kTotalStrokes`;
-      const resp = await fetch(url, { method: "GET" });
-      if (!resp.ok) return 0;
-      const j = await resp.json();
-      const item = j && j[0] ? j[0] : null;
-      const n = Number((item && item.stroke_count) || (item && item.kTotalStrokes) || 0);
-      if (n > 0) {
-        strokeCache[ch] = n;
-        try { localStorage.setItem(STROKE_CACHE_KEY, JSON.stringify(strokeCache)); } catch (_) {}
-        return n;
-      }
-    } catch (e) {}
-    return 0;
-  }
+  // Choose randomly among the top 2 candidates (or fewer if not enough)
+  const top = pairs.slice(0, Math.min(2, pairs.length));
+  const pick = top[Math.floor(Math.random() * top.length)];
 
-  async function pickMostStrokesChar(text) {
-    const chars = Array.from(text).filter(isHan);
-    if (!chars.length) return null;
-
-    // Evaluate unique chars to reduce API calls
-    const uniq = Array.from(new Set(chars));
-    const pairs = await Promise.all(uniq.map(async ch => [ch, await fetchStrokeCount(ch)]));
-
-    // Sort desc by strokes
-    pairs.sort((a, b) => (b[1] || 0) - (a[1] || 0));
-
-    // Choose randomly among the top 2 candidates (or fewer if not enough)
-    const top = pairs.slice(0, Math.min(2, pairs.length));
-    const pick = top[Math.floor(Math.random() * top.length)];
-
-    return { ch: pick[0], strokes: pick[1] || 0, candidates: top };
-  }
+  return { ch: pick[0], strokes: pick[1] || 0, candidates: top };
+}
 
   function firstHanChar(s) {
     const m = (s || "").match(/[\u4E00-\u9FFF]/);
@@ -518,11 +489,6 @@ function segmentChinese(text) {
     el.pad.addEventListener("pointermove", move);
     el.pad.addEventListener("pointerup", end);
     el.pad.addEventListener("pointercancel", end);
-
-    // touch-action none is set in style, but keep touch events too
-    el.pad.addEventListener("touchstart", start, { passive: false });
-    el.pad.addEventListener("touchmove", move, { passive: false });
-    el.pad.addEventListener("touchend", end, { passive: false });
 
     el.clearPad.addEventListener("click", () => {
       if (!padCtx) return;
@@ -588,6 +554,26 @@ function segmentChinese(text) {
       const v = isInk ? 0 : 255;
       cd[i] = v; cd[i+1] = v; cd[i+2] = v; cd[i+3] = 255;
     }
+// Slightly thicken black strokes (helps light handwriting)
+// Simple 1px dilation on the binarized crop
+const outD = new Uint8ClampedArray(cd);
+const isBlack = (idx) => cd[idx] === 0; // we set pure B/W
+for (let y = 1; y < ch - 1; y++) {
+  for (let x = 1; x < cw - 1; x++) {
+    const i = (y * cw + x) * 4;
+    const neighbors =
+      isBlack(i) ||
+      isBlack(i - 4) || isBlack(i + 4) ||
+      isBlack(i - cw * 4) || isBlack(i + cw * 4) ||
+      isBlack(i - cw * 4 - 4) || isBlack(i - cw * 4 + 4) ||
+      isBlack(i + cw * 4 - 4) || isBlack(i + cw * 4 + 4);
+    if (neighbors) {
+      outD[i] = 0; outD[i + 1] = 0; outD[i + 2] = 0; outD[i + 3] = 255;
+    }
+  }
+}
+cimg.data.set(outD);
+
     cctx.putImageData(cimg, 0, 0);
 
     // Draw into a normalized 640x640 with margins
@@ -605,7 +591,7 @@ function segmentChinese(text) {
     const dx = (target - dw) / 2;
     const dy = (target - dh) / 2;
 
-    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingEnabled = false;
     octx.drawImage(crop, 0, 0, cw, ch, dx, dy, dw, dh);
 
     lastOcrPreparedDataUrl = out.toDataURL("image/png");
@@ -659,7 +645,7 @@ function segmentChinese(text) {
     if (Math.random() >= getSpotProb()) return false;
 
     const itemText = currentText();
-    const picked = await pickMostStrokesChar(itemText);
+    const picked = pickMostStrokesChar(itemText);
     if (!picked || !picked.ch) return false;
 
     state.pendingCheck = { targetChar: picked.ch, itemText, reason: `最多笔画（约 ${picked.strokes} 画）` };
@@ -896,7 +882,7 @@ persistIfNeeded();
     const total = state.items.length;
     const answered = state.results.filter(r => r && (r.correct === true || r.correct === false));
     const ok = answered.filter(r => r.correct).length;
-    const pct = total ? Math.round((ok / total) * 100) : 0;
+    const pct = answered.length ? Math.round((ok / answered.length) * 100) : 0;
 
     const wrongs = answered.filter(r => r.correct === false).map(r => r.text);
     const unmarked = state.items
@@ -953,6 +939,14 @@ persistIfNeeded();
     renderQuestion();
     persistIfNeeded();
   }
+
+function resetReviewState() {
+  state.pendingCheck = null;
+  state.flags = [];
+  state.manualChecks = [];
+  showCheckUI(false);
+  if (typeof closeReviewModal === "function") closeReviewModal();
+}
 
     function clearReviewForNewRound() {
     // Clear parent-review items so they don't carry over into the next round
@@ -1034,15 +1028,6 @@ function startWithMistakes() {
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_TEXT);      return;
     }
-
-  function resetReviewState() {
-    state.pendingCheck = null;
-    state.flags = [];
-    state.manualChecks = [];
-    // also clear any UI remnants
-    showCheckUI(false);
-    closeReviewModal?.();
-  }
 
     const payload = { state, ts: Date.now(), practice: document.body.classList.contains("practice") };
     localStorage.setItem(LS_KEY, JSON.stringify(payload));
@@ -1135,10 +1120,8 @@ function startWithMistakes() {
   el.markRight.addEventListener("pointerdown", () => { lockTap(120); });
   el.markWrong.addEventListener("pointerdown", () => { lockTap(120); });
   // Use pointerup as primary (works well on mobile); click as fallback
-  el.markRight.addEventListener("pointerup", () => mark(true));
-  el.markWrong.addEventListener("pointerup", () => mark(false));
-  el.markRight.addEventListener("click", () => mark(true));
-  el.markWrong.addEventListener("click", () => mark(false));
+    el.markRight.addEventListener("pointerup", (e) => { e.preventDefault(); mark(true); });
+  el.markWrong.addEventListener("pointerup", (e) => { e.preventDefault(); mark(false); });
 
   el.rate.addEventListener("input", () => { setPills(); persistIfNeeded(); });
   el.pitch.addEventListener("input", () => { setPills(); persistIfNeeded(); });
