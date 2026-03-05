@@ -55,6 +55,8 @@
     body.locktap #practiceCard { pointer-events: none; }
     body.locktap #checkArea { pointer-events: auto; }
 
+
+    body.locktap #markRight, body.locktap #markWrong { pointer-events: auto; }
 </style>
 </head>
 <body>
@@ -1086,9 +1088,12 @@ function startWithMistakes() {
   el.speakAgain.addEventListener("click", () => speak(currentText()));
   el.show.addEventListener("click", showAnswer);
 
-  // Prevent accidental selection/extra tap on mobile
-  el.markRight.addEventListener("pointerdown", (e) => { e.preventDefault(); lockTap(180); });
-  el.markWrong.addEventListener("pointerdown", (e) => { e.preventDefault(); lockTap(180); });
+  // Prevent accidental selection/extra tap on mobile (compatible)
+  el.markRight.addEventListener("pointerdown", () => { lockTap(120); });
+  el.markWrong.addEventListener("pointerdown", () => { lockTap(120); });
+  // Use pointerup as primary (works well on mobile); click as fallback
+  el.markRight.addEventListener("pointerup", () => mark(true));
+  el.markWrong.addEventListener("pointerup", () => mark(false));
   el.markRight.addEventListener("click", () => mark(true));
   el.markWrong.addEventListener("click", () => mark(false));
 
