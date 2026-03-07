@@ -344,23 +344,20 @@ function segmentChinese(text) {
   return t0
     // 去掉行首项目符号
     .replace(/^[ 	]*[•·●○▪▫■□◆◇\-–—*]+[ 	]+/gm, "")
-    // 把中文/英文引号统一去掉
+    // 统一去掉中英文引号
     .replace(/[“”‘’"']/g, "")
-    // 按常见中文分隔标点切分，包括冒号
-    .replace(/[，,。.!！?？；;：:]+/g, "
-")
+    // 按常见分隔标点切分，包括冒号
+    .replace(/[，,。.!！?？；;：:]+/g, "\n")
     // 合并多余换行
-    .replace(/
-+/g, "
-")
-    .split("
-")
+    .replace(/\n+/g, "\n")
+    .split("\n")
     .map(s => s.trim())
     // 去掉残留列表符号
     .map(s => s.replace(/^[•·●○▪▫■□◆◇\-–—*]+/g, "").trim())
-    // 过滤空白 / 纯符号
+    // 只保留含中文字符的片段
     .filter(s => !!s && /[一-鿿]/.test(s));
 }
+
 
   function maybeShuffle(arr) {
     // 固定模式：不打乱顺序
