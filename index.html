@@ -435,9 +435,10 @@ function segmentChinese(text) {
 
   // Sort desc by strokes
   pairs.sort((a, b) => (b[1] || 0) - (a[1] || 0));
+  if (!pairs.length) return null;
 
-  // Choose randomly among the top 2 candidates (or fewer if not enough)
-  const top = pairs.slice(0, Math.min(2, pairs.length));
+  // Choose randomly among the top 5 candidates (or fewer if not enough)
+  const top = pairs.slice(0, Math.min(5, pairs.length));
   const pick = top[Math.floor(Math.random() * top.length)];
 
   return { ch: pick[0], strokes: pick[1] || 0, candidates: top };
@@ -653,7 +654,7 @@ cimg.data.set(outD);
     el.checkPrompt.textContent = "抽查：请写（听语音提示）";
     // 语音提示要写的字（不在屏幕上显示，避免直接抄）
     speak(`请写${picked.ch}`);
-    el.checkNote.textContent = `规则：从本题里选笔画最多的前 2 个字中随机抽 1 个（${picked.strokes || "?"} 画）`;
+    el.checkNote.textContent = `规则：从本题里选笔画最多的前 5 个字中随机抽 1 个（${picked.strokes || "?"} 画）`;
     el.ocrResult.textContent = "";
     // avoid accidental taps selecting text on mobile
     lockTap(260);
