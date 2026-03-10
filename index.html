@@ -790,13 +790,26 @@
     }
 
 
-    function speakImmediate(text) {
-      if (!("speechSynthesis" in window)) return;
+    function speakImmediate(text, onEnd) {
+      if (!("speechSynthesis" in window)) {
+        if (typeof onEnd === "function") onEnd();
+        return;
+      }
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "zh-CN";
       u.rate = Number(el.rate.value);
       u.pitch = Number(el.pitch.value);
+      if (typeof onEnd === "function") {
+        let called = false;
+        const done = () => {
+          if (called) return;
+          called = true;
+          onEnd();
+        };
+        u.onend = done;
+        u.onerror = done;
+      }
       window.speechSynthesis.speak(u);
     }
 
@@ -852,14 +865,17 @@
       });
       persistIfNeeded();
 
-      setTimeout(() => {
+      const goNext = () => {
         if (state.idx >= state.tasks.length - 1) {
           finishPractice();
         } else {
           state.idx += 1;
           renderTask();
         }
-      }, result === "correct" ? 650 : 220);
+      };
+
+      const delay = Number.isFinite(extra.advanceDelayMs) ? extra.advanceDelayMs : (result === "correct" ? 650 : 220);
+      setTimeout(goNext, delay);
     }
 
     async function submitOCR() {
@@ -884,13 +900,25 @@
           const feedback = getSuccessFeedback();
           showFlash(`<div class="ok">${feedback.text}</div>`);
           flashPadSuccess();
-          speakImmediate(feedback.speech);
           state.streak -= 1;
-          recordAndAdvance("correct", {
-            method: "ocr",
-            recognized,
-            image: prepared.dataUrl
-          });
+          const isLongPraise = feedback.text !== "对了 ✅";
+          if (isLongPraise) {
+            speakImmediate(feedback.speech, () => {
+              recordAndAdvance("correct", {
+                method: "ocr",
+                recognized,
+                image: prepared.dataUrl,
+                advanceDelayMs: 120
+              });
+            });
+          } else {
+            speakImmediate(feedback.speech);
+            recordAndAdvance("correct", {
+              method: "ocr",
+              recognized,
+              image: prepared.dataUrl
+            });
+          }
           return;
         }
 
