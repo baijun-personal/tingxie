@@ -5,97 +5,67 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>中文听写练习</title>
   <style>
-    body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 16px; line-height: 1.4; }
-    h1 { font-size: 20px; margin: 0 0 12px; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; margin: 12px 0; }
-    textarea { width: 100%; min-height: 140px; padding: 10px; border-radius: 10px; border: 1px solid #ccc; font-size: 14px; }
-    button { padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; background: #fff; cursor: pointer; margin: 6px 6px 0 0; }
-    button.primary { border-color: #111; }
-    button.danger { border-color: #b00020; color: #b00020; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .muted { color: #666; font-size: 13px; }
-    .big { font-size: 28px; letter-spacing: 1px; }
-    .pinyin { font-size: 16px; margin-top: 6px; color: #444; }
-    .hiddenAnswer { filter: blur(10px); user-select: none; }
-    .pill { display: inline-block; padding: 3px 10px; border: 1px solid #ddd; border-radius: 999px; font-size: 12px; color: #444; }
-    .list { margin: 8px 0 0; padding-left: 18px; }
-    .ok { color: #0a7a0a; }
-    .bad { color: #b00020; }
-    .twoCol { display: grid; grid-template-columns: 1fr; gap: 10px; }
-    @media (min-width: 900px) { .twoCol { grid-template-columns: 1fr 1fr; } }
-
-    /* 练习模式：隐藏输入区（整个左侧卡片） */
-    body.practice #inputCard { display: none; }
-
-    /* 抽查中：隐藏整句，避免直接抄 */
-    body.checking #answer { visibility: hidden; }
-    body.checking #answerPinyin { display: none !important; }
-
-    /* 顶部工具条 */
-    .topbar { display:flex; gap:8px; align-items:center; justify-content:space-between; }
-    .topbar .left { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-
-    /* 简单提示条 */
+    body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 16px; line-height: 1.45; color:#111; }
+    h1 { font-size: 20px; margin: 0; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .card { border: 1px solid #ddd; border-radius: 14px; padding: 14px; margin: 12px 0; background:#fff; }
+    .twoCol { display:grid; grid-template-columns:1fr; gap:12px; }
+    @media (min-width: 980px) { .twoCol { grid-template-columns: 1fr 1.2fr; } }
+    textarea { width:100%; min-height:200px; padding:10px; border-radius:10px; border:1px solid #ccc; font-size:14px; }
+    button { padding:10px 12px; border:1px solid #ccc; border-radius:10px; background:#fff; cursor:pointer; margin:6px 6px 0 0; }
+    button.primary { border-color:#111; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .muted { color:#666; font-size:13px; }
+    .pill { display:inline-block; padding:3px 10px; border:1px solid #ddd; border-radius:999px; font-size:12px; }
+    .ok { color:#0a7a0a; }
+    .bad { color:#b00020; }
+    .warn { color:#9a6400; }
+    .hidden { display:none !important; }
+    .big { font-size:28px; }
+    .prompt { font-size:22px; line-height:1.5; margin-top:8px; }
+    .target { font-size:48px; text-align:center; line-height:1; }
+    .manualCompare { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:stretch; margin-top:12px; }
+    .compareBox { border:1px solid #ddd; border-radius:12px; padding:10px; background:#fafafa; min-height:220px; display:flex; flex-direction:column; }
+    .compareTitle { font-size:13px; color:#666; margin-bottom:8px; }
+    .handWrap, .charWrap { flex:1; display:flex; align-items:center; justify-content:center; }
+    .charWrap { font-size:160px; background:#fff; border:1px solid #eee; border-radius:12px; }
+    #reviewImage { max-width:100%; max-height:280px; border:1px solid #eee; border-radius:12px; background:#fff; }
+    #pad { border:1px solid #ccc; border-radius:12px; background:#fff; touch-action:none; }
     #toast {
       position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
       background: rgba(0,0,0,0.82); color: #fff;
       padding: 10px 12px; border-radius: 12px; font-size: 13px;
-      opacity: 0; pointer-events: none; transition: opacity 180ms ease;
-      max-width: 90vw;
+      opacity: 0; pointer-events: none; transition: opacity 180ms ease; max-width: 90vw;
     }
     #toast.show { opacity: 1; }
-  
-    /* 准备模式：未开始练习时隐藏练习区 */
-    body:not(.practice) #practiceCard { display: none; }
-
-    /* 防止手机上长按/误触导致文字被选中 */
-    button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-    #practiceCard { -webkit-user-select: none; user-select: none; }
-    body.locktap #practiceCard { pointer-events: none; }
-    body.locktap #checkArea { pointer-events: auto; }
-
-
-    body.locktap #markRight, body.locktap #markWrong { pointer-events: auto; }
-</style>
+    ul { margin:8px 0 0; padding-left:20px; }
+    li { margin:4px 0; }
+    body.practice #inputCard { display:none; }
+    body:not(.practice) #practiceCard { display:none; }
+  </style>
 </head>
 <body>
   <div class="topbar">
-    <div class="left">
-      <h1 style="margin:0;">中文听写练习（网页单文件版）</h1>
+    <div class="row">
+      <h1>中文听写练习（网页单文件版）</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
-    <div>
-      <button id="exitPractice" style="display:none;">退出练习（显示输入区）</button>
-    </div>
+    <button id="exitPractice" class="hidden">退出练习</button>
   </div>
 
   <div class="twoCol">
-    <!-- 左侧：输入区（练习模式会隐藏整个卡片） -->
     <div class="card" id="inputCard">
-      <div class="row" style="justify-content:space-between;">
-        <div>
-          <div>1) 粘贴内容（词、短语、句子都可以）</div>
-          <div class="muted">会自动按句末标点切分（，。？！；等），每一段作为一题</div>
-        </div>
+      <div>1) 粘贴内容</div>
+      <div class="muted" style="margin-top:4px;">每行一个项目。格式示例：检查视力 1 / 表演结束 1,2,3 / 布置课堂</div>
+
+      <textarea id="input" placeholder="检查视力 1&#10;表演结束 1,2,3&#10;布置课堂"></textarea>
+
+      <div class="row" style="margin-top:10px;">
         <label class="muted">
           <input id="remember" type="checkbox" checked />
           记住内容与进度
         </label>
-        <label class="muted" style="margin-left:12px;display:flex;align-items:center;gap:6px;">
-          抽查概率
-          <input id="spotProb" type="number" min="0" max="100" step="5" value="25" style="width:64px;" />
-          %
-        </label>
-      </div>
-
-      <textarea id="input" placeholder="例：我喜欢秋天的风。落叶飘过幽径，黄昏染上长亭。&#10;也可以直接一行一个词：&#10;落叶&#10;黄昏&#10;幽径"></textarea>
-
-      <div class="row">
-        <span class="muted">固定设置：按句末标点切分（，。？！；等）；进入题目自动朗读；不打乱顺序。</span>
-      </div>
-
-      <div class="row">
         <label class="muted">语速
           <input id="rate" type="range" min="0.6" max="1.2" step="0.05" value="0.95" />
           <span id="rateVal" class="pill"></span>
@@ -107,70 +77,87 @@
       </div>
 
       <div class="row">
-        <button class="primary" id="start">开始练习（隐藏输入区）</button>
-        <button id="previewBtn">预览切分结果</button>
-        <button class="danger" id="resetAll">清空/重置</button>
+        <button class="primary" id="start">开始练习</button>
+        <button id="previewBtn">检查格式</button>
+        <button id="resetAll">清空/重置</button>
       </div>
 
-      <div id="preview" class="muted" style="margin-top:10px;"></div>
+      <div id="preview" style="margin-top:10px;"></div>
     </div>
 
-    <!-- 右侧：练习区 -->
     <div class="card" id="practiceCard">
       <div>2) 练习区</div>
-      <div class="row" style="justify-content:space-between;margin-top:6px;">
+
+      <div class="row" style="justify-content:space-between; margin-top:8px;">
         <div>
           <span id="progress" class="pill">未开始</span>
-          <span id="score" class="pill">正确率：-</span>
-          <span id="marked" class="pill" style="display:none;"></span>
+          <span id="score" class="pill">正确：-</span>
         </div>
-        <div class="muted"></div>
       </div>
 
-      <div style="margin-top:10px;">
-        <div class="muted">当前内容（默认隐藏）</div>
-        <div id="answer" class="big hiddenAnswer">——</div>
-        <div id="answerPinyin" class="pinyin" style="display:none;"></div>
+      <div style="margin-top:12px;">
+        <div class="muted">当前题目</div>
+        <div id="lineText" class="prompt">——</div>
+        <div class="muted" style="margin-top:8px;">当前要写的字</div>
+        <div id="speakHint" class="pill" style="margin-top:6px;">会朗读“原句 + 的 + 目标字”</div>
       </div>
 
-      <div style="margin-top:12px; display:none;" id="checkArea">
-        <div class="row" style="justify-content:space-between;">
-          <div id="checkPrompt" class="pill"></div>
-          <div class="muted" id="checkNote">只写一个字，写大一点（尽量居中），然后提交识别</div>
+      <div id="actionStage" style="margin-top:14px;">
+        <div class="row">
+          <button id="replayBtn">🔊 重听</button>
+          <button class="primary" id="writeBtn">写答案</button>
+          <button id="dontKnowBtn">我不会</button>
         </div>
+      </div>
 
+      <div id="writingStage" class="hidden" style="margin-top:14px;">
+        <div class="muted">请写一个字，写大一点、尽量居中。</div>
         <div style="margin-top:8px;">
-          <canvas id="pad" width="294" height="294" style="border:1px solid #ccc;border-radius:12px;background:#fff;touch-action:none;"></canvas>
+          <canvas id="pad" width="294" height="294"></canvas>
         </div>
-
         <div class="row" style="margin-top:8px;">
           <button id="clearPad">清空手写板</button>
-          <button id="repeatCheckAudio">🔊 再听提示</button>
+          <button id="replayWriteBtn">🔊 重听</button>
           <button class="primary" id="submitOCR">提交识别</button>
-          <button id="skipCheck">跳过抽查</button>
+          <button id="backToActionsBtn">返回</button>
         </div>
-
-        <div id="ocrResult"></div>
-      <div id="debugBox" style="margin-top:6px;font-size:12px;color:#aa0000;white-space:pre-wrap;display:none;"></div><div class="muted" style="margin-top:6px;"></div>
+        <div id="ocrStatus" class="muted" style="margin-top:6px;"></div>
       </div>
 
-      <div class="row" id="answerControls" style="margin-top:10px;">
-        <button id="speakAgain" disabled>🔊 再听题目</button>
-        <button class="primary" id="show" disabled>看答案</button>
-        <button id="markRight" disabled>我写对了</button>
-        <button id="markWrong" disabled>我写错了</button>
+      <div id="manualStage" class="hidden" style="margin-top:14px;">
+        <div class="muted">OCR 不能确认是否正确，请手动检查。</div>
+        <div class="manualCompare">
+          <div class="compareBox">
+            <div class="compareTitle">你写的字</div>
+            <div class="handWrap"><img id="reviewImage" alt="handwriting" /></div>
+          </div>
+          <div class="compareBox">
+            <div class="compareTitle">正确写法</div>
+            <div id="correctCharBox" class="charWrap"></div>
+          </div>
         </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="primary" id="manualRightBtn">我写对了</button>
+          <button id="manualWrongBtn">我写错了</button>
+        </div>
+      </div>
 
-      <div id="summary" style="margin-top:14px;"></div>
+      <div id="dontKnowStage" class="hidden" style="margin-top:14px;">
+        <div class="muted">正确写法</div>
+        <div id="dontKnowChar" class="target" style="margin-top:8px;">字</div>
+        <div class="row" style="margin-top:10px;">
+          <button class="primary" id="nextAfterDontKnowBtn">下一题</button>
+        </div>
+      </div>
+
+      <div id="resultFlash" style="margin-top:10px;"></div>
+      <div id="summary" style="margin-top:16px;"></div>
     </div>
   </div>
 
   <div id="toast"></div>
 
-  <!-- 拼音库：只用来把汉字转拼音 -->
-  <script src="https://unpkg.com/pinyin-pro@3.27.0/dist/index.js"></script>
-
-<script id="strokeCountData" type="application/json">
+  <script id="strokeCountData" type="application/json">
 {
   "1": "一乙",
   "2": "二十丁厂七卜八人入乂儿匕几九刁了刀力乃又乜",
@@ -201,1049 +188,723 @@
   "30": "爨",
   "36": "齉"
 }
-</script>
-<script>
-(() => {
-  // =========================
-  // 🔑 Google Vision API Key (you fill in)
-  // =========================
-  const GOOGLE_VISION_API_KEY = "AIzaSyA63xV0MbwPf5nfTttpl_FHOAYnpTymPfM";
+  </script>
 
-  const $ = (id) => document.getElementById(id);
+  <script>
+  (() => {
+    const GOOGLE_VISION_API_KEY = "AIzaSyA63xV0MbwPf5nfTttpl_FHOAYnpTymPfM";
 
-  const el = {
-    modePill: $("modePill"),
-    exitPractice: $("exitPractice"),
-    inputCard: $("inputCard"),
+    const $ = (id) => document.getElementById(id);
+    const el = {
+      modePill: $("modePill"),
+      exitPractice: $("exitPractice"),
+      input: $("input"),
+      remember: $("remember"),
+      rate: $("rate"),
+      pitch: $("pitch"),
+      rateVal: $("rateVal"),
+      pitchVal: $("pitchVal"),
+      start: $("start"),
+      previewBtn: $("previewBtn"),
+      preview: $("preview"),
+      resetAll: $("resetAll"),
 
-    input: $("input"),
-    remember: $("remember"),
-    spotProb: $("spotProb"),
-        rate: $("rate"),
-    pitch: $("pitch"),
-    rateVal: $("rateVal"),
-    pitchVal: $("pitchVal"),
-    start: $("start"),
-    previewBtn: $("previewBtn"),
-    preview: $("preview"),
-    resetAll: $("resetAll"),
+      progress: $("progress"),
+      score: $("score"),
+      lineText: $("lineText"),
+      speakHint: $("speakHint"),
+      actionStage: $("actionStage"),
+      writingStage: $("writingStage"),
+      manualStage: $("manualStage"),
+      dontKnowStage: $("dontKnowStage"),
+      resultFlash: $("resultFlash"),
+      summary: $("summary"),
 
-    progress: $("progress"),
-    score: $("score"),
-    marked: $("marked"),
-    answer: $("answer"),
-    answerPinyin: $("answerPinyin"),
-    speakAgain: $("speakAgain"),
-    show: $("show"),
-    markRight: $("markRight"),
-    markWrong: $("markWrong"),
-        summary: $("summary"),
-    answerControls: $("answerControls"),
-    toast: $("toast"),
-
-    // spot-check UI
-    checkArea: $("checkArea"),
-    checkPrompt: $("checkPrompt"),
-    checkNote: $("checkNote"),
-    pad: $("pad"),
-    clearPad: $("clearPad"),
-    repeatCheckAudio: $("repeatCheckAudio"),
-    submitOCR: $("submitOCR"),
-    skipCheck: $("skipCheck"),
-    ocrResult: $("ocrResult"),
-    debugBox: $("debugBox"),
-  };
-
-  let state = {
-    items: [],
-    idx: 0,
-    revealed: false,
-    results: [],
-    finished: false,
-
-    // spot-check
-    pendingCheck: null, // { targetChar, itemText, reason }
-    flags: [], // [{ idx, itemText, targetChar, gotChar, ok, ts }]
-  };
-
-  const LS_KEY = "tingxie_v3_state";
-  const LS_TEXT = "tingxie_v3_text";
-
-  let toastTimer = null;
-  function toast(msg) {
-    if (!msg) return;
-    el.toast.textContent = msg;
-    el.toast.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.toast.classList.remove("show"), 900);
-  }
-
-  function lockTap(ms = 220) {
-    document.body.classList.add("locktap");
-    setTimeout(() => document.body.classList.remove("locktap"), ms);
-  }
-
-
-  function getSpotProb() {
-    const v = Number(localStorage.getItem("spotProbPct") || "25");
-    if (Number.isFinite(v)) return Math.max(0, Math.min(100, v)) / 100;
-    return 0.25;
-  }
-
-  function setSpotProbPct(pct) {
-    const v = Math.max(0, Math.min(100, Number(pct) || 0));
-    localStorage.setItem("spotProbPct", String(v));
-  }
-
-  // ensure default spot-check probability exists
-  if (localStorage.getItem("spotProbPct") == null) setSpotProbPct(25);
-
-
-  function setMode(isPractice) {
-    document.body.classList.toggle("practice", !!isPractice);
-    el.exitPractice.style.display = isPractice ? "inline-block" : "none";
-    el.modePill.textContent = isPractice ? "模式：练习中" : "模式：准备";
-    persistIfNeeded();
-  }
-
-  function setPills() {
-    el.rateVal.textContent = el.rate.value;
-    el.pitchVal.textContent = el.pitch.value;
-  }
-
-  function normalizeText(t) {
-    return (t || "").replace(/\r\n/g, "\n").trim();
-  }
-
-  function splitFallback(text) {
-    const raw = text
-      .replace(/[，。！？；：、,.!?;:]+/g, "\n")
-      .replace(/\s+/g, "\n")
-      .split("\n")
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    const out = [];
-    for (const s of raw) {
-      if (s.length <= 10) out.push(s);
-      else {
-        let i = 0;
-        while (i < s.length) {
-          out.push(s.slice(i, i + 8));
-          i += 8;
-        }
-      }
-    }
-    return out;
-  }
-
-function segmentChinese(text) {
-  const t0 = normalizeText(text);
-  if (!t0) return [];
-
-  return t0
-    // 去掉行首项目符号
-    .replace(/^[ 	]*[•·●○▪▫■□◆◇\-–—*]+[ 	]+/gm, "")
-    // 统一去掉中英文引号
-    .replace(/[“”‘’"']/g, "")
-    // 按常见分隔标点切分，包括冒号
-    .replace(/[，,。.!！?？；;：:]+/g, "\n")
-    // 合并多余换行
-    .replace(/\n+/g, "\n")
-    .split("\n")
-    .map(s => s.trim())
-    // 去掉残留列表符号
-    .map(s => s.replace(/^[•·●○▪▫■□◆◇\-–—*]+/g, "").trim())
-    // 只保留含中文字符的片段
-    .filter(s => !!s && /[一-鿿]/.test(s));
-}
-
-
-  function maybeShuffle(arr) {
-    // 固定模式：不打乱顺序
-    return arr;
-  }
-
-  function speak(text) {
-    if (!("speechSynthesis" in window)) {
-      alert("这个浏览器不支持朗读（speechSynthesis）。建议用 Chrome/Edge/Safari。");
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "zh-CN";
-    u.rate = Number(el.rate.value);
-    u.pitch = Number(el.pitch.value);
-    window.speechSynthesis.speak(u);
-  }
-
-  function toPinyin(text) {
-    try {
-      if (window.pinyinPro && window.pinyinPro.pinyin) {
-        return window.pinyinPro.pinyin(text, { toneType: "tone", type: "array" }).join(" ");
-      }
-    } catch (e) {}
-    return "";
-  }
-
-  function currentText() {
-    return state.items[state.idx] || "";
-  }
-
-  // =========================
-  // Spot-check helpers (stroke count + canvas + OCR)
-  // =========================
-
-  // Last prepared OCR image (dataURL) for manual review
-  let lastOcrPreparedDataUrl = "";
-  // Offline stroke-count map (embedded as JSON in <script id="strokeCountData">)
-  // Offline stroke-count map (embedded as JSON in <script id="strokeCountData">)
-  let strokeMap = null;
-  function initStrokeMap() {
-    if (strokeMap) return strokeMap;
-    strokeMap = {};
-    try {
-      const elData = document.getElementById("strokeCountData");
-      const raw = elData ? elData.textContent : "";
-      const data = JSON.parse(raw || "{}");
-      // Format: { "1": "一乙...", "2": "二十...", ... }
-      for (const k of Object.keys(data)) {
-        const n = Number(k);
-        const str = String(data[k] || "");
-        for (const ch of str) strokeMap[ch] = n;
-      }
-    } catch (e) {
-      strokeMap = {};
-    }
-    return strokeMap;
-  }
-
-  function isHan(ch) { return /[\u4E00-\u9FFF]/.test(ch); }
-  function fetchStrokeCount(ch) {
-  if (!ch) return 0;
-  const m = initStrokeMap();
-  return (m && m[ch]) ? (Number(m[ch]) || 0) : 0;
-}
-
-  function pickMostStrokesChar(text) {
-  const chars = Array.from(text).filter(isHan);
-  if (!chars.length) return null;
-
-  // Evaluate unique chars to avoid repeated work
-  const uniq = Array.from(new Set(chars));
-  const pairs = uniq.map(ch => [ch, fetchStrokeCount(ch)]);
-
-  // Sort desc by strokes
-  pairs.sort((a, b) => (b[1] || 0) - (a[1] || 0));
-  if (!pairs.length) return null;
-
-  // Choose randomly among the top 5 candidates (or fewer if not enough)
-  const top = pairs.slice(0, Math.min(5, pairs.length));
-  const pick = top[Math.floor(Math.random() * top.length)];
-
-  return { ch: pick[0], strokes: pick[1] || 0, candidates: top };
-}
-
-  function firstHanChar(s) {
-    const m = (s || "").match(/[\u4E00-\u9FFF]/);
-    return m ? m[0] : "";
-  }
-
-  // Canvas drawing
-  let padCtx = null;
-  let drawing = false;
-
-  function initPad() {
-    if (!el.pad) return;
-    padCtx = el.pad.getContext("2d");
-    padCtx.lineWidth = 10;
-    padCtx.lineCap = "round";
-    padCtx.strokeStyle = "#000";
-
-    const getPos = (e) => {
-      const rect = el.pad.getBoundingClientRect();
-      const pt = e.touches ? e.touches[0] : e;
-      return { x: pt.clientX - rect.left, y: pt.clientY - rect.top };
+      replayBtn: $("replayBtn"),
+      writeBtn: $("writeBtn"),
+      dontKnowBtn: $("dontKnowBtn"),
+      pad: $("pad"),
+      clearPad: $("clearPad"),
+      replayWriteBtn: $("replayWriteBtn"),
+      submitOCR: $("submitOCR"),
+      backToActionsBtn: $("backToActionsBtn"),
+      ocrStatus: $("ocrStatus"),
+      reviewImage: $("reviewImage"),
+      correctCharBox: $("correctCharBox"),
+      manualRightBtn: $("manualRightBtn"),
+      manualWrongBtn: $("manualWrongBtn"),
+      dontKnowChar: $("dontKnowChar"),
+      nextAfterDontKnowBtn: $("nextAfterDontKnowBtn"),
+      toast: $("toast"),
     };
 
-    const start = (e) => {
-      drawing = true;
-      padCtx.beginPath();
-      const p = getPos(e);
-      padCtx.moveTo(p.x, p.y);
-      e.preventDefault?.();
+    const LS_KEY = "tingxie_v4_structured";
+    const LS_TEXT = "tingxie_v4_text";
+
+    let toastTimer = null;
+    let padCtx = null;
+    let drawing = false;
+    let lastPreparedImage = "";
+
+    let state = {
+      sourceText: "",
+      allTasks: [],
+      tasks: [],
+      idx: 0,
+      results: [],
+      finished: false,
+      currentFlow: "actions",
+      pendingManual: null
     };
 
-    const move = (e) => {
-      if (!drawing) return;
-      const p = getPos(e);
-      padCtx.lineTo(p.x, p.y);
-      padCtx.stroke();
-      e.preventDefault?.();
-    };
-
-    const end = (e) => {
-      drawing = false;
-      e.preventDefault?.();
-    };
-
-    el.pad.addEventListener("pointerdown", start);
-    el.pad.addEventListener("pointermove", move);
-    el.pad.addEventListener("pointerup", end);
-    el.pad.addEventListener("pointercancel", end);
-
-    el.clearPad.addEventListener("click", () => {
-      if (!padCtx) return;
-      padCtx.clearRect(0, 0, el.pad.width, el.pad.height);
-      el.ocrResult.textContent = "";
-    });
-  }
-
-  function padToBase64() {
-    // Auto-crop to ink bounds + add padding + threshold + upscale.
-    const src = el.pad;
-    const w = src.width, h = src.height;
-    const srcCtx = src.getContext("2d");
-    const img = srcCtx.getImageData(0, 0, w, h);
-    const d = img.data;
-
-    // Find bounding box of non-white pixels
-    let minX = w, minY = h, maxX = -1, maxY = -1;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-        // treat anything not near-white as ink
-        if (a > 0 && (r < 245 || g < 245 || b < 245)) {
-          if (x < minX) minX = x;
-          if (y < minY) minY = y;
-          if (x > maxX) maxX = x;
-          if (y > maxY) maxY = y;
-        }
-      }
+    function toast(msg) {
+      if (!msg) return;
+      el.toast.textContent = msg;
+      el.toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.toast.classList.remove("show"), 900);
     }
 
-    // If no ink detected, just upscale whole canvas
-    if (maxX < 0) {
-      minX = 0; minY = 0; maxX = w - 1; maxY = h - 1;
+    function setPills() {
+      el.rateVal.textContent = el.rate.value;
+      el.pitchVal.textContent = el.pitch.value;
     }
 
-    const pad = 24; // padding around ink
-    minX = Math.max(0, minX - pad);
-    minY = Math.max(0, minY - pad);
-    maxX = Math.min(w - 1, maxX + pad);
-    maxY = Math.min(h - 1, maxY + pad);
-
-    const cw = maxX - minX + 1;
-    const ch = maxY - minY + 1;
-
-    // Crop to offscreen canvas
-    const crop = document.createElement("canvas");
-    crop.width = cw;
-    crop.height = ch;
-    const cctx = crop.getContext("2d");
-    cctx.drawImage(src, minX, minY, cw, ch, 0, 0, cw, ch);
-
-    // Threshold to make strokes solid
-    const cimg = cctx.getImageData(0, 0, cw, ch);
-    const cd = cimg.data;
-    for (let i = 0; i < cd.length; i += 4) {
-      const r = cd[i], g = cd[i+1], b = cd[i+2], a = cd[i+3];
-      // grayscale
-      const gray = (r * 0.299 + g * 0.587 + b * 0.114);
-      // If pixel is near-white, set to white; else black
-      const isInk = a > 0 && gray < 240;
-      const v = isInk ? 0 : 255;
-      cd[i] = v; cd[i+1] = v; cd[i+2] = v; cd[i+3] = 255;
-    }
-// Slightly thicken black strokes (helps light handwriting)
-// Simple 1px dilation on the binarized crop
-const outD = new Uint8ClampedArray(cd);
-const isBlack = (idx) => cd[idx] === 0; // we set pure B/W
-for (let y = 1; y < ch - 1; y++) {
-  for (let x = 1; x < cw - 1; x++) {
-    const i = (y * cw + x) * 4;
-    const neighbors =
-      isBlack(i) ||
-      isBlack(i - 4) || isBlack(i + 4) ||
-      isBlack(i - cw * 4) || isBlack(i + cw * 4) ||
-      isBlack(i - cw * 4 - 4) || isBlack(i - cw * 4 + 4) ||
-      isBlack(i + cw * 4 - 4) || isBlack(i + cw * 4 + 4);
-    if (neighbors) {
-      outD[i] = 0; outD[i + 1] = 0; outD[i + 2] = 0; outD[i + 3] = 255;
-    }
-  }
-}
-cimg.data.set(outD);
-
-    cctx.putImageData(cimg, 0, 0);
-
-    // Draw into a normalized 640x640 with margins
-    const target = 640;
-    const out = document.createElement("canvas");
-    out.width = target;
-    out.height = target;
-    const octx = out.getContext("2d");
-    octx.fillStyle = "#fff";
-    octx.fillRect(0, 0, target, target);
-
-    const scale = Math.min((target * 0.88) / cw, (target * 0.88) / ch);
-    const dw = cw * scale;
-    const dh = ch * scale;
-    const dx = (target - dw) / 2;
-    const dy = (target - dh) / 2;
-
-    octx.imageSmoothingEnabled = false;
-    octx.drawImage(crop, 0, 0, cw, ch, dx, dy, dw, dh);
-
-    lastOcrPreparedDataUrl = out.toDataURL("image/png");
-    return lastOcrPreparedDataUrl.split(",")[1];
-  }
-
-  async function recognizeWithGoogleVision() {
-    if (!GOOGLE_VISION_API_KEY || GOOGLE_VISION_API_KEY === "PUT_YOUR_KEY_HERE") {
-      toast("请先在代码里填入 Google Vision API Key");
-      return null;
-    }
-
-    const body = {
-      requests: [{
-        image: { content: padToBase64() },
-        features: [{ type: "TEXT_DETECTION" }],
-        imageContext: { languageHints: ["zh-Hans"] }
-      }]
-    };
-
-    const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(GOOGLE_VISION_API_KEY)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`Vision API error: ${res.status} ${txt}`);
-    }
-    const data = await res.json();
-    const text = data?.responses?.[0]?.textAnnotations?.[0]?.description || "";
-    return String(text).trim();
-  }
-
-  function showCheckUI(show) {
-    document.body.classList.toggle("checking", !!show);
-    el.checkArea.style.display = show ? "block" : "none";
-    // Prevent skipping: disable marking buttons during spot-check
-    if (el.markRight) el.markRight.disabled = !!show;
-    if (el.markWrong) el.markWrong.disabled = !!show;
-    if (!show) {
-      el.checkPrompt.textContent = "";
-      el.ocrResult.textContent = "";
-      if (padCtx) padCtx.clearRect(0, 0, el.pad.width, el.pad.height);
-    }
-  }
-
-  async function maybeTriggerSpotCheckOnMarkRight() {
-    // configurable probability (default 25%)
-    if (Math.random() >= getSpotProb()) return false;
-
-    const itemText = currentText();
-    const picked = pickMostStrokesChar(itemText);
-    if (!picked || !picked.ch) return false;
-
-    state.pendingCheck = { targetChar: picked.ch, itemText, reason: `最多笔画（约 ${picked.strokes} 画）` };
-    el.checkPrompt.textContent = "抽查：请写（听语音提示）";
-    // 语音提示要写的字（不在屏幕上显示，避免直接抄）
-    speak(`请写${picked.ch}`);
-    el.checkNote.textContent = `规则：从本题里选笔画最多的前 5 个字中随机抽 1 个（${picked.strokes || "?"} 画）`;
-    el.ocrResult.textContent = "";
-    // avoid accidental taps selecting text on mobile
-    lockTap(260);
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    // delay showing UI so finger can leave the button
-    setTimeout(() => {
-      showCheckUI(true);
-      try { el.checkArea.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
-    }, 180);
-    toast("触发抽查：请手写一个字");
-    persistIfNeeded();
-    return true;
-  }
-
-  function repeatCheckAudio() {
-    if (!state.pendingCheck) return;
-    speak(`请写${state.pendingCheck.targetChar}`);
-  }
-
-  async function submitSpotCheck() {
-    if (!state.pendingCheck) {
-      toast("当前没有抽查任务");
-      return;
-    }
-    el.ocrResult.textContent = "识别中...";
-    let recognized = "";
-    try {
-      recognized = await recognizeWithGoogleVision();
-    } catch (e) {
-      el.ocrResult.textContent = "识别失败（网络或Key问题）";
-      toast("识别失败");
-      return;
-    }
-
-    const expected = state.pendingCheck.targetChar;
-    const gotFirst = firstHanChar(recognized);
-    const hanAll = (recognized || "").match(/[\u4E00-\u9FFF]/g) || [];
-    const ok = (gotFirst === expected) || hanAll.includes(expected);
-    const got = gotFirst || (hanAll[0] || "");
-
-    el.ocrResult.textContent = `识别：${got || "（无汉字）"}；目标：${expected}；${ok ? "通过 ✅" : "不通过 ❌"}；原始：${(recognized || "").replace(/\s+/g, " ").slice(0, 30)}`;
-
-    // Record flag for parents review (only record failures or all? record all with ok flag)
-    state.flags = Array.isArray(state.flags) ? state.flags : [];
-    state.flags.push({
-      idx: state.idx,
-      itemText: state.pendingCheck.itemText,
-      targetChar: expected,
-      gotChar: got || "",
-      ok,
-      ts: Date.now(),
-        img: lastOcrPreparedDataUrl || "",
-    });
-
-    // Fallback plan: if OCR mismatch, mark as "需家长复核" instead of hard fail.
-    if (!ok) {
-      state.manualChecks = Array.isArray(state.manualChecks) ? state.manualChecks : [];
-      state.manualChecks.push({
-        idx: state.idx,
-        itemText: state.pendingCheck.itemText,
-        targetChar: expected,
-        gotChar: got || "",
-        recognized: (recognized || "").slice(0, 200),
-        img: lastOcrPreparedDataUrl || "",
-        ts: Date.now(),
-        reason: "OCR识别不一致（需家长复核）",
-      });
-    }
-
-    persistIfNeeded();
-
-    // If failed, highlight for later: we still allow progress, but keep a clear record
-    toast(ok ? "抽查通过 ✅" : "抽查待复核（已记录）");
-
-    state.pendingCheck = null;
-    showCheckUI(false);
-
-    // Continue to next question (same as original mark flow)
-    setTimeout(() => next(), 250);
-  }
-
-  function updateScorePill() {
-    const answered = state.results.filter(r => r && (r.correct === true || r.correct === false));
-    if (answered.length === 0) {
-      el.score.textContent = "正确率：-";
-      return;
-    }
-    const ok = answered.filter(r => r.correct).length;
-    const pct = Math.round((ok / answered.length) * 100);
-    el.score.textContent = `正确率：${pct}% (${ok}/${answered.length})`;
-  }
-
-  function setMarkedPill() {
-    const r = state.results[state.idx];
-    if (!r) {
-      el.marked.style.display = "none";
-      return;
-    }
-    el.marked.style.display = "inline-block";
-    if (r.correct) {
-      el.marked.textContent = "已标记：对";
-      el.marked.classList.remove("bad");
-      el.marked.classList.add("ok");
-    } else {
-      el.marked.textContent = "已标记：错";
-      el.marked.classList.remove("ok");
-      el.marked.classList.add("bad");
-    }
-  }
-
-  function renderQuestion() {
-    const total = state.items.length;
-    if (total === 0) {
-      el.progress.textContent = "未开始";
-      el.answer.textContent = "——";
-      el.answer.classList.add("hiddenAnswer");
-      el.answerPinyin.style.display = "none";
-      el.answerPinyin.textContent = "";
-      el.summary.innerHTML = "";
-      el.marked.style.display = "none";
-      el.speakAgain.disabled = true;
-      el.show.disabled = true;
-      el.markRight.disabled = true;
-      el.markWrong.disabled = true;
-      updateScorePill();
-      return;
-    }
-
-    el.progress.textContent = `进度：${state.idx + 1}/${total}`;
-    el.answer.textContent = currentText();
-
-    if (state.revealed) {
-      el.answer.classList.remove("hiddenAnswer");
-      const py = toPinyin(currentText());
-      if (py) {
-        el.answerPinyin.style.display = "block";
-        el.answerPinyin.textContent = py;
-      } else {
-        el.answerPinyin.style.display = "none";
-        el.answerPinyin.textContent = "";
-      }
-    } else {
-      el.answer.classList.add("hiddenAnswer");
-      el.answerPinyin.style.display = "none";
-      el.answerPinyin.textContent = "";
-    }
-
-    const done = !!state.finished;
-
-    el.speakAgain.disabled = done ? true : false;
-    el.show.disabled = done ? true : state.revealed;
-    // During spot-check, keep buttons disabled so child cannot skip.
-    const checking = !!state.pendingCheck;
-    el.markRight.disabled = checking ? true : (done ? true : !state.revealed);
-    el.markWrong.disabled = checking ? true : (done ? true : !state.revealed);
-
-    // spot-check UI: default hidden unless pending
-    if (!state.pendingCheck) {
-      showCheckUI(false);
-    }
-
-    setMarkedPill();
-    updateScorePill();
-
-    if (!state.finished) speak(currentText());
-persistIfNeeded();
-  }
-
-  function showAnswer() {
-    state.revealed = true;
-    renderQuestion();
-  }
-
-
-  function mark(correct) {
-    if (state.finished) return;
-    if (!state.revealed) {
-      toast("先点“看答案”，再标记对错");
-      return;
-    }
-
-    const text = currentText();
-
-    // If marked wrong, behave as before
-    if (!correct) {
-      state.results[state.idx] = { text, correct: false };
-      toast("已标记：错 ❌");
-      setMarkedPill();
-      updateScorePill();
+    function setMode(isPractice) {
+      document.body.classList.toggle("practice", !!isPractice);
+      el.exitPractice.classList.toggle("hidden", !isPractice);
+      el.modePill.textContent = isPractice ? "模式：练习中" : "模式：准备";
       persistIfNeeded();
-      setTimeout(() => next(), 150);
-      return;
     }
 
-    // Marked right: 20% chance to trigger spot check
-    // We temporarily mark as correct, but final verification is recorded in flags (for parents).
-    state.results[state.idx] = { text, correct: true };
-    toast("已标记：对 ✅");
-    setMarkedPill();
-    updateScorePill();
-    persistIfNeeded();
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    }
 
-    maybeTriggerSpotCheckOnMarkRight().then((triggered) => {
-      if (triggered) {
-        // Don't auto-next; wait for OCR submit/skip
+    function normalizeText(t) {
+      return String(t || "").replace(/\r\n/g, "\n").trim();
+    }
+
+    function isHan(ch) {
+      return /[\u4E00-\u9FFF]/.test(ch);
+    }
+
+    function hanChars(text) {
+      return Array.from(String(text || "")).filter(isHan);
+    }
+
+    function speak(text) {
+      if (!("speechSynthesis" in window)) {
+        alert("这个浏览器不支持朗读。建议用 Chrome / Edge / Safari。");
         return;
       }
-      setTimeout(() => next(), 150);
-    });
-  }
-
-  function next() {
-    if (!state.revealed) {
-      toast("先点“看答案”");
-      return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "zh-CN";
+      u.rate = Number(el.rate.value);
+      u.pitch = Number(el.pitch.value);
+      window.speechSynthesis.speak(u);
     }
-    if (state.idx < state.items.length - 1) {
-      state.idx += 1;
-      state.revealed = false;
-      renderQuestion();
-      return;
+
+    function getSpeakText(task) {
+      return `${task.lineText}的${task.targetChar}`;
     }
-    finish();
-  }
 
-  function finish() {
-    state.finished = true;
+    function parseSource(text) {
+      const src = normalizeText(text);
+      const lines = src ? src.split(/\n+/) : [];
+      const warnings = [];
+      const tasks = [];
+      const normalizedLines = [];
 
-    // Summary mode: hide answer controls so "mark" cannot trigger new checks
-    if (el.answerControls) el.answerControls.style.display = "none";
-    const total = state.items.length;
-    const answered = state.results.filter(r => r && (r.correct === true || r.correct === false));
-    const ok = answered.filter(r => r.correct).length;
-    const pct = answered.length ? Math.round((ok / answered.length) * 100) : 0;
+      lines.forEach((raw, i) => {
+        const lineNo = i + 1;
+        const line = raw.trim();
+        if (!line) return;
 
-    const wrongs = answered.filter(r => r.correct === false).map(r => r.text);
-    const unmarked = state.items
-      .map((t, i) => ({ t, i }))
-      .filter(x => !state.results[x.i] || (state.results[x.i].correct !== true && state.results[x.i].correct !== false))
-      .map(x => x.t);
+        let textPart = line;
+        let indexPart = "";
+        const m = line.match(/^(.*?)(?:\s+(\d+(?:\s*,\s*\d+)*))?$/);
+        if (m) {
+          textPart = (m[1] || "").trim();
+          indexPart = (m[2] || "").trim();
+        }
 
-    renderQuestion();
+        const chars = hanChars(textPart);
+        if (!chars.length) {
+          warnings.push(`第 ${lineNo} 行没有可练习的中文内容：${escapeHtml(line)}`);
+          return;
+        }
 
-    el.summary.innerHTML = `
-      <div class="card" style="margin:12px 0 0;">
-        <div class="big">总结</div>
-        <div style="margin-top:6px;">
-          <span class="pill">总题数：${total}</span>
-          <span class="pill ok">对：${ok}</span>
-          <span class="pill bad">错：${answered.length - ok}</span>
-          <span class="pill">正确率：${pct}%</span>
+        let indexes;
+        if (indexPart) {
+          indexes = Array.from(new Set(indexPart.split(",").map(x => Number(String(x).trim())).filter(n => Number.isInteger(n) && n >= 1)));
+          const valid = indexes.filter(n => n <= chars.length);
+          const ignored = indexes.filter(n => n > chars.length);
+          if (ignored.length) {
+            warnings.push(`第 ${lineNo} 行超出范围的序号已忽略：${ignored.join(", ")}`);
+          }
+          indexes = valid;
+          if (!indexes.length) {
+            warnings.push(`第 ${lineNo} 行指定序号全部无效，因此这一行不会进入练习。`);
+          }
+        } else {
+          indexes = chars.map((_, idx) => idx + 1);
+        }
+
+        normalizedLines.push({
+          lineNo,
+          raw: line,
+          textPart,
+          indexes: indexes.slice(),
+          totalChars: chars.length
+        });
+
+        indexes.forEach(pos => {
+          tasks.push({
+            id: `${lineNo}-${pos}-${chars[pos - 1]}`,
+            lineNo,
+            lineText: textPart,
+            targetChar: chars[pos - 1],
+            charIndex: pos
+          });
+        });
+      });
+
+      return { src, lines: normalizedLines, tasks, warnings };
+    }
+
+    function renderFormatCheck() {
+      const parsed = parseSource(el.input.value);
+      const linesHtml = parsed.lines.length
+        ? `<ul>${parsed.lines.map(item => {
+            const previewTargets = item.indexes.map(i => hanChars(item.textPart)[i - 1]).filter(Boolean).join("、");
+            return `<li>第 ${item.lineNo} 行：${escapeHtml(item.textPart)} → 检查序号 ${item.indexes.join(", ") || "（无）"}${previewTargets ? `（${escapeHtml(previewTargets)}）` : ""}</li>`;
+          }).join("")}</ul>`
+        : `<div class="muted">没有可用内容。</div>`;
+
+      const warningsHtml = parsed.warnings.length
+        ? `<div class="bad" style="margin-top:10px;">发现的问题：</div><ul>${parsed.warnings.map(w => `<li>${w}</li>`).join("")}</ul>`
+        : `<div class="ok" style="margin-top:10px;">格式看起来没有问题。</div>`;
+
+      el.preview.innerHTML = `
+        <div class="card" style="margin-top:0;">
+          <div>将生成 ${parsed.tasks.length} 个练习项</div>
+          ${linesHtml}
+          ${warningsHtml}
         </div>
-        ${wrongs.length ? `<div style="margin-top:10px;"><div class="muted">错题（建议再练）：</div><ul class="list">${wrongs.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : `<div style="margin-top:10px;" class="ok">没有错题 ✅</div>`}
-        ${unmarked.length ? `<div style="margin-top:10px;"><div class="muted">未标记对错的题：</div><ul class="list">${unmarked.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ``}
-
-        
-        ${buildManualCheckSummary()}
-
-        <div class="row" style="margin-top:10px;">
-          <button class="primary" id="retryMistakes">用错题再练一遍</button>
-          <button id="retryAll">再练一遍（全部题目）</button>
-        </div>
-        <div class="muted" style="margin-top:10px;">如需重新粘贴新内容，点右上角“退出练习”。</div>
-      </div>
-    `;
-
-    const bm = document.getElementById("retryMistakes");
-    if (bm) bm.addEventListener("click", startWithMistakes);
-    const ba = document.getElementById("retryAll");
-    if (ba) ba.addEventListener("click", retryAll);
-
-    persistIfNeeded();
-  }
-
-
-  function restartWithItems(items) {
-    if (el.answerControls) el.answerControls.style.display = "";
-    const list = (items || []).map(x => String(x).trim()).filter(Boolean);
-    if (!list.length) {
-      toast("没有可练的题目");
-      return;
-    }
-    state.items = list;
-    state.idx = 0;
-    state.revealed = false;
-    state.results = new Array(list.length).fill(null);
-    state.finished = false;
-    el.summary.innerHTML = "";
-    renderQuestion();
-    persistIfNeeded();
-  }
-
-function resetReviewState() {
-  state.pendingCheck = null;
-  state.flags = [];
-  state.manualChecks = [];
-  showCheckUI(false);
-  if (typeof closeReviewModal === "function") closeReviewModal();
-}
-
-    function clearReviewForNewRound() {
-    // Clear parent-review items so they don't carry over into the next round
-    state.pendingCheck = null;
-    state.flags = [];
-    state.manualChecks = [];
-    showCheckUI(false);
-    if (typeof closeReviewModal === "function") closeReviewModal();
-  }
-
-function startWithMistakes() {
-    clearReviewForNewRound();
-    const wrongs = (state.results || []).filter(r => r && r.correct === false).map(r => r.text);
-    const uniq = Array.from(new Set(wrongs));
-    if (!uniq.length) {
-      toast("没有错题 ✅");
-      return;
-    }
-    restartWithItems(uniq);
-  }
-
-  function retryAll() {
-    clearReviewForNewRound();
-    restartWithItems(state.items || []);
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-  }
-
-  function openReviewModal(item) {
-    const modal = document.getElementById("reviewModal");
-    const titleEl = document.getElementById("reviewTitle");
-    const metaEl = document.getElementById("reviewMeta");
-    const imgEl = document.getElementById("reviewImg");
-    if (!modal || !titleEl || !metaEl || !imgEl) {
-      toast("无法打开复核窗口（元素缺失）");
-      return;
-    }
-    titleEl.textContent = `需家长复核：第 ${item.idx + 1} 题`;
-    metaEl.textContent = `目标字：${item.targetChar}；识别：${item.gotChar || "（无）"}；原因：${item.reason || "识别不一致"}\n原句：${item.itemText}`;
-    imgEl.src = item.img || "";
-    modal.style.display = "flex";
-  }
-
-  function closeReviewModal() {
-    const modal = document.getElementById("reviewModal");
-    const imgEl = document.getElementById("reviewImg");
-    if (modal) modal.style.display = "none";
-    if (imgEl) imgEl.src = "";
-  }
-
-
-  function buildManualCheckSummary() {
-    const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
-    if (!arr.length) return ``;
-
-    // Show the latest 50, but keep absolute indices so clicks always open the correct item.
-    const slice = arr.slice(-50);
-    const base = arr.length - slice.length;
-
-    // Render newest first for convenience
-    const items = slice.map((it, i) => ({ it, abs: base + i }))
-      .reverse()
-      .map(({ it, abs }) => {
-        const label = `第 ${it.idx + 1} 题：抽查“${it.targetChar}”`;
-        return `<li><a href="javascript:void(0)" class="reviewLink" data-review-abs="${abs}">${escapeHtml(label)}</a></li>`;
-      })
-      .join("");
-
-    return `<div style="margin-top:10px;"><div class="muted">需家长复核（点击查看手写，最多显示最近 50 条）：</div><ul class="list">${items}</ul></div>`;
-  }
-
-
-  
-
-  function persistIfNeeded() {
-    if (!el.remember.checked) {
-      localStorage.removeItem(LS_KEY);
-      localStorage.removeItem(LS_TEXT);      return;
+      `;
+      return parsed;
     }
 
-    const payload = { state, ts: Date.now(), practice: document.body.classList.contains("practice") };
-    localStorage.setItem(LS_KEY, JSON.stringify(payload));
-    localStorage.setItem(LS_TEXT, el.input.value || "");  }
+    function initPad() {
+      padCtx = el.pad.getContext("2d");
+      padCtx.lineWidth = 10;
+      padCtx.lineCap = "round";
+      padCtx.strokeStyle = "#000";
 
-  function restoreIfNeeded() {
-    try {
-      setPills();
+      const getPos = (e) => {
+        const rect = el.pad.getBoundingClientRect();
+        const pt = e.touches ? e.touches[0] : e;
+        return { x: pt.clientX - rect.left, y: pt.clientY - rect.top };
+      };
 
-      const savedText = localStorage.getItem(LS_TEXT);
-      if (savedText) el.input.value = savedText;
+      const start = (e) => {
+        drawing = true;
+        const p = getPos(e);
+        padCtx.beginPath();
+        padCtx.moveTo(p.x, p.y);
+        e.preventDefault?.();
+      };
 
-      const raw = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-      if (raw && raw.state && Array.isArray(raw.state.items)) {
-        state = raw.state;
-        state.idx = Math.min(state.idx || 0, Math.max(0, state.items.length - 1));
-        state.revealed = !!state.revealed;
-        state.results = Array.isArray(state.results) ? state.results : [];
-        state.finished = !!state.finished;
-        renderQuestion();
-        setMode(!!raw.practice); // 恢复练习模式（如果上次在练）
-      } else {
-        setMode(false);
+      const move = (e) => {
+        if (!drawing) return;
+        const p = getPos(e);
+        padCtx.lineTo(p.x, p.y);
+        padCtx.stroke();
+        e.preventDefault?.();
+      };
+
+      const end = (e) => {
+        drawing = false;
+        e.preventDefault?.();
+      };
+
+      el.pad.addEventListener("pointerdown", start);
+      el.pad.addEventListener("pointermove", move);
+      el.pad.addEventListener("pointerup", end);
+      el.pad.addEventListener("pointercancel", end);
+    }
+
+    function clearPad() {
+      padCtx.clearRect(0, 0, el.pad.width, el.pad.height);
+      lastPreparedImage = "";
+      el.ocrStatus.textContent = "";
+    }
+
+    function preparePadImage() {
+      const src = el.pad;
+      const w = src.width, h = src.height;
+      const srcCtx = src.getContext("2d");
+      const img = srcCtx.getImageData(0, 0, w, h);
+      const d = img.data;
+
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+          if (a > 0 && (r < 245 || g < 245 || b < 245)) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
       }
-    } catch (e) {
-      setMode(false);
+
+      if (maxX < 0) return null;
+
+      const pad = 24;
+      minX = Math.max(0, minX - pad);
+      minY = Math.max(0, minY - pad);
+      maxX = Math.min(w - 1, maxX + pad);
+      maxY = Math.min(h - 1, maxY + pad);
+
+      const cw = maxX - minX + 1;
+      const ch = maxY - minY + 1;
+
+      const crop = document.createElement("canvas");
+      crop.width = cw;
+      crop.height = ch;
+      const cctx = crop.getContext("2d");
+      cctx.drawImage(src, minX, minY, cw, ch, 0, 0, cw, ch);
+
+      const cimg = cctx.getImageData(0, 0, cw, ch);
+      const cd = cimg.data;
+      for (let i = 0; i < cd.length; i += 4) {
+        const r = cd[i], g = cd[i+1], b = cd[i+2], a = cd[i+3];
+        const gray = (r * 0.299 + g * 0.587 + b * 0.114);
+        const isInk = a > 0 && gray < 240;
+        const v = isInk ? 0 : 255;
+        cd[i] = v; cd[i+1] = v; cd[i+2] = v; cd[i+3] = 255;
+      }
+      cctx.putImageData(cimg, 0, 0);
+
+      const target = 640;
+      const out = document.createElement("canvas");
+      out.width = target;
+      out.height = target;
+      const octx = out.getContext("2d");
+      octx.fillStyle = "#fff";
+      octx.fillRect(0, 0, target, target);
+
+      const scale = Math.min((target * 0.88) / cw, (target * 0.88) / ch);
+      const dw = cw * scale;
+      const dh = ch * scale;
+      const dx = (target - dw) / 2;
+      const dy = (target - dh) / 2;
+
+      octx.imageSmoothingEnabled = false;
+      octx.drawImage(crop, 0, 0, cw, ch, dx, dy, dw, dh);
+
+      lastPreparedImage = out.toDataURL("image/png");
+      return {
+        dataUrl: lastPreparedImage,
+        base64: lastPreparedImage.split(",")[1]
+      };
     }
-  }
 
-  function start() {
-    if (el.answerControls) el.answerControls.style.display = "";
-    const text = normalizeText(el.input.value);
-    if (!text) {
-      alert("先粘贴一些中文内容。");
-      return;
-    }
-    const items = segmentChinese(text);
-    if (items.length === 0) {
-      alert("没有切分出任何词/短语。你可以勾选“一行一个”试试。");
-      return;
+    function firstHanChar(s) {
+      const m = String(s || "").match(/[\u4E00-\u9FFF]/);
+      return m ? m[0] : "";
     }
 
-    state = {
-      items: maybeShuffle(items),
-      idx: 0,
-      revealed: false,
-      results: new Array(items.length).fill(null),
-      finished: false,
-    };
+    async function recognizeWithGoogleVision(base64) {
+      if (!GOOGLE_VISION_API_KEY) throw new Error("Missing Vision API key");
+      const body = {
+        requests: [{
+          image: { content: base64 },
+          features: [{ type: "TEXT_DETECTION" }],
+          imageContext: { languageHints: ["zh-Hans"] }
+        }]
+      };
 
-    el.summary.innerHTML = "";
-    setMode(true);          // 关键：进入练习模式，隐藏输入区
-    renderQuestion();
-  }
-
-  function preview() {
-    const text = normalizeText(el.input.value);
-    if (!text) { el.preview.textContent = "（空）"; return; }
-    const items = segmentChinese(text);
-    el.preview.innerHTML = `
-      <div class="card" style="margin-top:10px;">
-        <div class="muted">预览切分（共 ${items.length} 项）：</div>
-        <div style="margin-top:6px;">${items.slice(0, 60).map(x => `<span class="pill">${escapeHtml(x)}</span>`).join(" ")}</div>
-        ${items.length > 60 ? `<div class="muted" style="margin-top:6px;">仅显示前 60 项</div>` : ``}
-      </div>
-    `;
-  }
-
-  function resetAll() {
-    if (el.answerControls) el.answerControls.style.display = "";
-    if (!confirm("确定要清空内容和进度吗？")) return;
-    state = { items: [], idx: 0, revealed: false, results: [], finished: false };
-    el.input.value = "";
-    el.preview.innerHTML = "";
-    el.summary.innerHTML = "";
-    setMode(false); // 退出练习模式，显示输入区
-    renderQuestion();
-    localStorage.removeItem(LS_KEY);
-    localStorage.removeItem(LS_TEXT);  }
-
-  // events
-  el.start.addEventListener("click", start);
-  el.previewBtn.addEventListener("click", preview);
-  el.resetAll.addEventListener("click", resetAll);
-
-  el.exitPractice.addEventListener("click", () => setMode(false));
-
-  el.speakAgain.addEventListener("click", () => speak(currentText()));
-  el.show.addEventListener("click", showAnswer);
-
-  // Prevent accidental selection/extra tap on mobile (compatible)
-  el.markRight.addEventListener("pointerdown", () => { lockTap(120); });
-  el.markWrong.addEventListener("pointerdown", () => { lockTap(120); });
-  // Use pointerup as primary (works well on mobile); click as fallback
-    el.markRight.addEventListener("pointerup", (e) => { e.preventDefault(); mark(true); });
-  el.markWrong.addEventListener("pointerup", (e) => { e.preventDefault(); mark(false); });
-
-  el.rate.addEventListener("input", () => { setPills(); persistIfNeeded(); });
-  el.pitch.addEventListener("input", () => { setPills(); persistIfNeeded(); });
-  el.remember.addEventListener("change", persistIfNeeded);
-
-  // spot-check probability control (0-100), persisted in localStorage
-  if (el.spotProb) {
-    const savedPct = Number(localStorage.getItem("spotProbPct") || "25");
-    el.spotProb.value = String(Number.isFinite(savedPct) ? savedPct : 25);
-    el.spotProb.addEventListener("change", () => {
-      setSpotProbPct(el.spotProb.value);
-      toast(`抽查概率：${Math.max(0, Math.min(100, Number(el.spotProb.value) || 0))}%`);
-    });
-  }
-
-
-  // spot-check events
-  if (el.submitOCR) el.submitOCR.addEventListener("click", submitSpotCheck);
-if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatCheckAudio);
-  if (el.skipCheck) el.skipCheck.addEventListener("click", () => {
-    if (state.pendingCheck) {
-      // record as skipped (ok=false) so parents see it
-      state.flags = Array.isArray(state.flags) ? state.flags : [];
-      state.flags.push({
-        idx: state.idx,
-        itemText: state.pendingCheck.itemText,
-        targetChar: state.pendingCheck.targetChar,
-        gotChar: "(skipped)",
-        ok: false,
-        ts: Date.now(),
-        img: lastOcrPreparedDataUrl || (el.pad ? el.pad.toDataURL("image/png") : ""),
+      const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(GOOGLE_VISION_API_KEY)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
       });
-      state.manualChecks = Array.isArray(state.manualChecks) ? state.manualChecks : [];
-      state.manualChecks.push({
-        idx: state.idx,
-        itemText: state.pendingCheck.itemText,
-        targetChar: state.pendingCheck.targetChar,
-        gotChar: "(skipped)",
-        recognized: "",
-        img: lastOcrPreparedDataUrl || (el.pad ? el.pad.toDataURL("image/png") : ""),
-        ts: Date.now(),
-        reason: "跳过抽查（需家长复核）",
-      });
-      toast("已跳过抽查（已记录）");
-      state.pendingCheck = null;
-      showCheckUI(false);
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Vision API error: ${res.status} ${txt}`);
+      }
+      const data = await res.json();
+      return String(data?.responses?.[0]?.textAnnotations?.[0]?.description || "").trim();
+    }
+
+    function currentTask() {
+      return state.tasks[state.idx] || null;
+    }
+
+    function setFlow(flow) {
+      state.currentFlow = flow;
+      el.actionStage.classList.toggle("hidden", flow !== "actions");
+      el.writingStage.classList.toggle("hidden", flow !== "writing");
+      el.manualStage.classList.toggle("hidden", flow !== "manual");
+      el.dontKnowStage.classList.toggle("hidden", flow !== "dontKnow");
       persistIfNeeded();
-      setTimeout(() => next(), 150);
-    } else {
-      showCheckUI(false);
     }
-  });
 
-  initPad();
-
-  // manual review modal events
-  if (el.reviewClose) el.reviewClose.addEventListener("click", closeReviewModal);
-  if (el.reviewModal) el.reviewModal.addEventListener("click", (e) => {
-    if (e.target === el.reviewModal) closeReviewModal();
-  });
-
-  // Click handler for review links in summary
-
-
-
-  // Robust capture-phase handler for manual review links (prevents default navigation reliably)
-  document.addEventListener("click", (e) => {
-    const tgt = e.target;
-    const link = tgt && tgt.closest ? tgt.closest(".reviewLink") : null;
-    if (!link) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const arr = Array.isArray(state.manualChecks) ? state.manualChecks : [];
-    const slice = arr.slice(-50);
-    const abs = Number(link.getAttribute("data-review-abs"));
-    const item = arr[abs];
-    if (item) openReviewModal(item);
-  }, true);
-
-  setPills();
-  restoreIfNeeded();
-
-  // Close modal via button or clicking overlay
-  document.addEventListener("click", (e) => {
-    const t = e.target;
-    if (!t) return;
-    if (t.id === "reviewClose") {
-      e.preventDefault();
-      closeReviewModal();
-      return;
+    function updateScore() {
+      const done = state.results.length;
+      const correct = state.results.filter(r => r.result === "correct").length;
+      const wrong = state.results.filter(r => r.result === "wrong").length;
+      const unknown = state.results.filter(r => r.result === "dontKnow").length;
+      el.score.textContent = `正确：${correct} / 已完成：${done} / 错：${wrong} / 不会：${unknown}`;
     }
-    const modal = document.getElementById("reviewModal");
-    if (modal && t === modal) {
-      closeReviewModal();
+
+    function renderTask() {
+      const task = currentTask();
+      if (!task) return;
+
+      el.summary.innerHTML = "";
+      el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
+      el.lineText.textContent = task.lineText;
+      el.speakHint.textContent = `朗读内容：${getSpeakText(task)}`;
+      el.resultFlash.innerHTML = "";
+      el.ocrStatus.textContent = "";
+      el.reviewImage.src = "";
+      el.correctCharBox.textContent = "";
+      el.dontKnowChar.textContent = task.targetChar;
+      state.pendingManual = null;
+      setFlow("actions");
+      clearPad();
+      updateScore();
+      speak(getSpeakText(task));
+      persistIfNeeded();
     }
-  });
 
-  renderQuestion();
-})();
-</script>
+    function startPractice(withTasks, sourceText) {
+      const tasks = (withTasks || []).map(t => ({ ...t }));
+      if (!tasks.length) {
+        toast("没有可练习的内容");
+        return;
+      }
+      state = {
+        sourceText: sourceText,
+        allTasks: parseSource(sourceText).tasks,
+        tasks,
+        idx: 0,
+        results: [],
+        finished: false,
+        currentFlow: "actions",
+        pendingManual: null
+      };
+      el.summary.innerHTML = "";
+      setMode(true);
+      renderTask();
+    }
 
-  <div id="reviewModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999;">
-    <div style="background:#fff;max-width:92vw;max-height:92vh;border-radius:14px;padding:12px;overflow:auto;">
-      <div class="row" style="justify-content:space-between;align-items:center;">
-        <div id="reviewTitle" class="pill"></div>
-        <button id="reviewClose">关闭</button>
-      </div>
-      <div class="muted" id="reviewMeta" style="margin-top:6px;white-space:pre-wrap;"></div>
-      <div style="margin-top:10px;display:flex;justify-content:center;">
-        <img id="reviewImg" alt="handwriting" style="max-width:86vw;max-height:70vh;border:1px solid #ddd;border-radius:12px;background:#fff;">
-      </div>
-    </div>
-  </div>
+    function beginFromInput() {
+      const parsed = renderFormatCheck();
+      if (!parsed.tasks.length) {
+        alert("没有可练习的内容。");
+        return;
+      }
+      startPractice(parsed.tasks, parsed.src);
+    }
+
+    function replayCurrent() {
+      const task = currentTask();
+      if (!task) return;
+      speak(getSpeakText(task));
+    }
+
+    function writeAnswer() {
+      setFlow("writing");
+      replayCurrent();
+    }
+
+    function showFlash(html) {
+      el.resultFlash.innerHTML = html;
+    }
+
+    function recordAndAdvance(result, extra = {}) {
+      const task = currentTask();
+      if (!task) return;
+      state.results.push({
+        taskId: task.id,
+        lineText: task.lineText,
+        targetChar: task.targetChar,
+        charIndex: task.charIndex,
+        lineNo: task.lineNo,
+        result,
+        ...extra
+      });
+      persistIfNeeded();
+      setTimeout(() => {
+        if (state.idx >= state.tasks.length - 1) {
+          finishPractice();
+        } else {
+          state.idx += 1;
+          renderTask();
+        }
+      }, 220);
+    }
+
+    async function submitOCR() {
+      const task = currentTask();
+      if (!task) return;
+
+      const prepared = preparePadImage();
+      if (!prepared) {
+        toast("请先在手写板上写字");
+        return;
+      }
+
+      el.ocrStatus.textContent = "识别中...";
+      try {
+        const recognized = await recognizeWithGoogleVision(prepared.base64);
+        const allHan = (recognized.match(/[\u4E00-\u9FFF]/g) || []);
+        const exact = allHan.includes(task.targetChar) || firstHanChar(recognized) === task.targetChar;
+
+        if (exact) {
+          el.ocrStatus.textContent = `OCR 识别：${allHan.join("") || "（无汉字）"}，判断为正确。`;
+          showFlash(`<div class="ok">写对了 ✅</div>`);
+          recordAndAdvance("correct", {
+            method: "ocr",
+            recognized,
+            image: prepared.dataUrl
+          });
+          return;
+        }
+
+        el.ocrStatus.textContent = `OCR 识别：${allHan.join("") || "（无汉字）"}，无法确认正确，进入手动检查。`;
+        state.pendingManual = {
+          image: prepared.dataUrl,
+          recognized,
+          task
+        };
+        el.reviewImage.src = prepared.dataUrl;
+        el.correctCharBox.textContent = task.targetChar;
+        setFlow("manual");
+        persistIfNeeded();
+      } catch (e) {
+        el.ocrStatus.textContent = "识别失败，请手动检查。";
+        state.pendingManual = {
+          image: prepared.dataUrl,
+          recognized: "",
+          task
+        };
+        el.reviewImage.src = prepared.dataUrl;
+        el.correctCharBox.textContent = task.targetChar;
+        setFlow("manual");
+        persistIfNeeded();
+      }
+    }
+
+    function manualMarkRight() {
+      const pending = state.pendingManual;
+      if (!pending) return;
+      showFlash(`<div class="ok">已标记：写对了 ✅</div>`);
+      recordAndAdvance("correct", {
+        method: "manual",
+        recognized: pending.recognized || "",
+        image: pending.image
+      });
+    }
+
+    function manualMarkWrong() {
+      const pending = state.pendingManual;
+      if (!pending) return;
+      showFlash(`<div class="bad">已标记：写错了 ❌</div>`);
+      recordAndAdvance("wrong", {
+        method: "manual",
+        recognized: pending.recognized || "",
+        image: pending.image
+      });
+    }
+
+    function markDontKnow() {
+      const task = currentTask();
+      if (!task) return;
+      el.dontKnowChar.textContent = task.targetChar;
+      setFlow("dontKnow");
+      persistIfNeeded();
+    }
+
+    function nextAfterDontKnow() {
+      const task = currentTask();
+      if (!task) return;
+      showFlash(`<div class="warn">这题记为“不会”。正确写法：${escapeHtml(task.targetChar)}</div>`);
+      recordAndAdvance("dontKnow");
+    }
+
+    function finishPractice() {
+      state.finished = true;
+      const total = state.results.length;
+      const correct = state.results.filter(r => r.result === "correct").length;
+      const wrong = state.results.filter(r => r.result === "wrong");
+      const dontKnow = state.results.filter(r => r.result === "dontKnow");
+      const pct = total ? Math.round(correct / total * 100) : 0;
+
+      const mistakes = state.results.filter(r => r.result !== "correct");
+      const retryTasks = state.allTasks.filter(task => mistakes.some(r => r.taskId === task.id));
+
+      el.progress.textContent = `已完成：${total} / ${state.tasks.length}`;
+      updateScore();
+      el.resultFlash.innerHTML = "";
+      el.actionStage.classList.add("hidden");
+      el.writingStage.classList.add("hidden");
+      el.manualStage.classList.add("hidden");
+      el.dontKnowStage.classList.add("hidden");
+
+      el.summary.innerHTML = `
+        <div class="card" style="margin:0;">
+          <div class="big">总结</div>
+          <div class="row" style="margin-top:8px;">
+            <span class="pill">总题数：${total}</span>
+            <span class="pill ok">正确：${correct}</span>
+            <span class="pill bad">写错：${wrong.length}</span>
+            <span class="pill warn">不会：${dontKnow.length}</span>
+            <span class="pill">正确率：${pct}%</span>
+          </div>
+
+          ${wrong.length ? `<div style="margin-top:12px;"><div class="muted">写错了的字：</div><ul>${wrong.map(r => `<li>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字 “${escapeHtml(r.targetChar)}”</li>`).join("")}</ul></div>` : `<div class="ok" style="margin-top:12px;">没有写错的字 ✅</div>`}
+
+          ${dontKnow.length ? `<div style="margin-top:12px;"><div class="muted">不会的字：</div><ul>${dontKnow.map(r => `<li>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字 “${escapeHtml(r.targetChar)}”</li>`).join("")}</ul></div>` : ``}
+
+          <div class="row" style="margin-top:12px;">
+            <button class="primary" id="retryAllBtn">从头开始</button>
+            <button id="retryWrongBtn" ${retryTasks.length ? "" : "disabled"}>只练习错了的和不会的</button>
+          </div>
+        </div>
+      `;
+
+      const retryAllBtn = $("retryAllBtn");
+      const retryWrongBtn = $("retryWrongBtn");
+
+      if (retryAllBtn) {
+        retryAllBtn.addEventListener("click", () => {
+          const parsed = parseSource(state.sourceText);
+          startPractice(parsed.tasks, state.sourceText);
+        });
+      }
+
+      if (retryWrongBtn) {
+        retryWrongBtn.addEventListener("click", () => {
+          startPractice(retryTasks, state.sourceText);
+        });
+      }
+
+      persistIfNeeded();
+    }
+
+    function resetAll() {
+      if (!confirm("确定要清空内容和进度吗？")) return;
+      state = {
+        sourceText: "",
+        allTasks: [],
+        tasks: [],
+        idx: 0,
+        results: [],
+        finished: false,
+        currentFlow: "actions",
+        pendingManual: null
+      };
+      el.input.value = "";
+      el.preview.innerHTML = "";
+      el.summary.innerHTML = "";
+      el.lineText.textContent = "——";
+      el.progress.textContent = "未开始";
+      el.score.textContent = "正确：-";
+      localStorage.removeItem(LS_KEY);
+      localStorage.removeItem(LS_TEXT);
+      setMode(false);
+      clearPad();
+    }
+
+    function persistIfNeeded() {
+      if (!el.remember.checked) {
+        localStorage.removeItem(LS_KEY);
+        localStorage.removeItem(LS_TEXT);
+        return;
+      }
+      localStorage.setItem(LS_TEXT, el.input.value || "");
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        state,
+        practice: document.body.classList.contains("practice"),
+        remember: el.remember.checked,
+        rate: el.rate.value,
+        pitch: el.pitch.value
+      }));
+    }
+
+    function restoreIfNeeded() {
+      setPills();
+      const savedText = localStorage.getItem(LS_TEXT);
+      if (savedText != null) el.input.value = savedText;
+
+      try {
+        const raw = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+        if (!raw) return;
+        if (raw.rate) el.rate.value = raw.rate;
+        if (raw.pitch) el.pitch.value = raw.pitch;
+        if (typeof raw.remember === "boolean") el.remember.checked = raw.remember;
+        setPills();
+
+        if (raw.state) {
+          state = raw.state;
+          if (raw.practice && Array.isArray(state.tasks) && state.tasks.length) {
+            setMode(true);
+            if (state.finished) {
+              finishPractice();
+            } else {
+              const task = currentTask();
+              if (task) {
+                el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
+                el.lineText.textContent = task.lineText;
+                el.speakHint.textContent = `朗读内容：${getSpeakText(task)}`;
+                updateScore();
+                if (state.currentFlow === "manual" && state.pendingManual) {
+                  el.reviewImage.src = state.pendingManual.image || "";
+                  el.correctCharBox.textContent = task.targetChar;
+                }
+                if (state.currentFlow === "dontKnow") {
+                  el.dontKnowChar.textContent = task.targetChar;
+                }
+                setFlow(state.currentFlow || "actions");
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    el.previewBtn.addEventListener("click", renderFormatCheck);
+    el.start.addEventListener("click", beginFromInput);
+    el.resetAll.addEventListener("click", resetAll);
+    el.exitPractice.addEventListener("click", () => setMode(false));
+
+    el.replayBtn.addEventListener("click", replayCurrent);
+    el.writeBtn.addEventListener("click", writeAnswer);
+    el.dontKnowBtn.addEventListener("click", markDontKnow);
+    el.clearPad.addEventListener("click", clearPad);
+    el.replayWriteBtn.addEventListener("click", replayCurrent);
+    el.submitOCR.addEventListener("click", submitOCR);
+    el.backToActionsBtn.addEventListener("click", () => setFlow("actions"));
+    el.manualRightBtn.addEventListener("click", manualMarkRight);
+    el.manualWrongBtn.addEventListener("click", manualMarkWrong);
+    el.nextAfterDontKnowBtn.addEventListener("click", nextAfterDontKnow);
+    el.rate.addEventListener("input", () => { setPills(); persistIfNeeded(); });
+    el.pitch.addEventListener("input", () => { setPills(); persistIfNeeded(); });
+    el.remember.addEventListener("change", persistIfNeeded);
+
+    initPad();
+    restoreIfNeeded();
+    setPills();
+  })();
+  </script>
 </body>
 </html>
