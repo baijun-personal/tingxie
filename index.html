@@ -43,6 +43,14 @@
     li { margin:4px 0; }
     body.practice #inputCard { display:none; }
     body:not(.practice) #practiceCard { display:none; }
+  
+    .summaryList { margin-top:12px; }
+    .summaryItem { display:flex; align-items:center; gap:12px; padding:8px 0; border-top:1px solid #eee; }
+    .summaryItem:first-child { border-top:none; }
+    .summaryThumb { width:88px; height:88px; object-fit:contain; border:1px solid #ddd; border-radius:10px; background:#fff; flex:0 0 88px; }
+    .summaryMeta { line-height:1.5; }
+    .summaryChar { font-size:28px; }
+
   </style>
 </head>
 <body>
@@ -749,13 +757,37 @@
     function finishPractice() {
       state.finished = true;
       const total = state.results.length;
-      const correct = state.results.filter(r => r.result === "correct").length;
+      const autoCorrect = state.results.filter(r => r.result === "correct" && r.method !== "manual");
+      const manualCorrect = state.results.filter(r => r.result === "correct" && r.method === "manual");
       const wrong = state.results.filter(r => r.result === "wrong");
       const dontKnow = state.results.filter(r => r.result === "dontKnow");
+      const correct = autoCorrect.length + manualCorrect.length;
       const pct = total ? Math.round(correct / total * 100) : 0;
 
       const mistakes = state.results.filter(r => r.result !== "correct");
       const retryTasks = state.allTasks.filter(task => mistakes.some(r => r.taskId === task.id));
+
+      const buildSimpleList = (items) => {
+        if (!items.length) return "";
+        return `<ul>${items.map(r => `<li>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字 “${escapeHtml(r.targetChar)}”</li>`).join("")}</ul>`;
+      };
+
+      const buildManualReview = (items) => {
+        if (!items.length) return `<div class="ok" style="margin-top:12px;">没有需要家长检查的手动判对项目 ✅</div>`;
+        return `
+          <div class="summaryList">
+            ${items.map(r => `
+              <div class="summaryItem">
+                <img class="summaryThumb" src="${r.image || ""}" alt="handwriting" />
+                <div class="summaryMeta">
+                  <div>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字</div>
+                  <div class="summaryChar">“${escapeHtml(r.targetChar)}”</div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      };
 
       el.progress.textContent = `已完成：${total} / ${state.tasks.length}`;
       updateScore();
@@ -776,9 +808,25 @@
             <span class="pill">正确率：${pct}%</span>
           </div>
 
-          ${wrong.length ? `<div style="margin-top:12px;"><div class="muted">写错了的字：</div><ul>${wrong.map(r => `<li>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字 “${escapeHtml(r.targetChar)}”</li>`).join("")}</ul></div>` : `<div class="ok" style="margin-top:12px;">没有写错的字 ✅</div>`}
+          <div style="margin-top:12px;">
+            <div class="muted">写对了（自动识别 / 自动确认）：</div>
+            ${autoCorrect.length ? buildSimpleList(autoCorrect) : `<div class="ok" style="margin-top:8px;">没有这类项目 ✅</div>`}
+          </div>
 
-          ${dontKnow.length ? `<div style="margin-top:12px;"><div class="muted">不会的字：</div><ul>${dontKnow.map(r => `<li>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字 “${escapeHtml(r.targetChar)}”</li>`).join("")}</ul></div>` : ``}
+          <div style="margin-top:12px;">
+            <div class="muted">写错了：</div>
+            ${wrong.length ? buildSimpleList(wrong) : `<div class="ok" style="margin-top:8px;">没有写错的字 ✅</div>`}
+          </div>
+
+          <div style="margin-top:12px;">
+            <div class="muted">我不会：</div>
+            ${dontKnow.length ? buildSimpleList(dontKnow) : `<div class="ok" style="margin-top:8px;">没有不会的字 ✅</div>`}
+          </div>
+
+          <div style="margin-top:12px;">
+            <div class="muted">家长检查（手动确认“我写对了”）：</div>
+            ${buildManualReview(manualCorrect)}
+          </div>
 
           <div class="row" style="margin-top:12px;">
             <button class="primary" id="retryAllBtn">从头开始</button>
