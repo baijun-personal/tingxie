@@ -95,22 +95,14 @@
         </div>
       </div>
 
-      <div style="margin-top:12px;">
-        <div class="muted">当前题目</div>
-        <div id="lineText" class="prompt">——</div>
-        <div class="muted" style="margin-top:8px;">当前要写的字</div>
-        <div id="speakHint" class="pill" style="margin-top:6px;">会朗读“原句 + 的 + 目标字”</div>
-      </div>
-
       <div id="actionStage" style="margin-top:14px;">
         <div class="row">
           <button id="replayBtn">🔊 重听</button>
-          <button class="primary" id="writeBtn">写答案</button>
           <button id="dontKnowBtn">我不会</button>
         </div>
       </div>
 
-      <div id="writingStage" class="hidden" style="margin-top:14px;">
+      <div id="writingStage" style="margin-top:14px;">
         <div class="muted">请写一个字，写大一点、尽量居中。</div>
         <div style="margin-top:8px;">
           <canvas id="pad" width="294" height="294"></canvas>
@@ -119,7 +111,7 @@
           <button id="clearPad">清空手写板</button>
           <button id="replayWriteBtn">🔊 重听</button>
           <button class="primary" id="submitOCR">提交识别</button>
-          <button id="backToActionsBtn">返回</button>
+
         </div>
         <div id="ocrStatus" class="muted" style="margin-top:6px;"></div>
       </div>
@@ -211,8 +203,6 @@
 
       progress: $("progress"),
       score: $("score"),
-      lineText: $("lineText"),
-      speakHint: $("speakHint"),
       actionStage: $("actionStage"),
       writingStage: $("writingStage"),
       manualStage: $("manualStage"),
@@ -221,13 +211,11 @@
       summary: $("summary"),
 
       replayBtn: $("replayBtn"),
-      writeBtn: $("writeBtn"),
       dontKnowBtn: $("dontKnowBtn"),
       pad: $("pad"),
       clearPad: $("clearPad"),
       replayWriteBtn: $("replayWriteBtn"),
       submitOCR: $("submitOCR"),
-      backToActionsBtn: $("backToActionsBtn"),
       ocrStatus: $("ocrStatus"),
       reviewImage: $("reviewImage"),
       correctCharBox: $("correctCharBox"),
@@ -384,7 +372,7 @@
         : `<div class="muted">没有可用内容。</div>`;
 
       const warningsHtml = parsed.warnings.length
-        ? `<div class="bad" style="margin-top:10px;">发现的问题：</div><ul>${parsed.warnings.map(w => `<li>${w}</li>`).join("")}</ul>`
+        ? `<div class="warn" style="margin-top:10px;">格式检查提示：</div><ul>${parsed.warnings.map(w => `<li>${w}</li>`).join("")}</ul>`
         : `<div class="ok" style="margin-top:10px;">格式看起来没有问题。</div>`;
 
       el.preview.innerHTML = `
@@ -399,10 +387,14 @@
 
     function initPad() {
       padCtx = el.pad.getContext("2d");
-      padCtx.lineWidth = 10;
+      padCtx.lineWidth = 12;
       padCtx.lineCap = "round";
+      padCtx.lineJoin = "round";
       padCtx.strokeStyle = "#000";
+      padCtx.imageSmoothingEnabled = true;
+      clearPad();
 
+      let lastPoint = null;
       const getPos = (e) => {
         const rect = el.pad.getBoundingClientRect();
         const pt = e.touches ? e.touches[0] : e;
@@ -412,21 +404,31 @@
       const start = (e) => {
         drawing = true;
         const p = getPos(e);
+        lastPoint = p;
         padCtx.beginPath();
         padCtx.moveTo(p.x, p.y);
+        padCtx.lineTo(p.x + 0.01, p.y + 0.01);
+        padCtx.stroke();
+        if (e.pointerId != null && el.pad.setPointerCapture) {
+          try { el.pad.setPointerCapture(e.pointerId); } catch (_) {}
+        }
         e.preventDefault?.();
       };
 
       const move = (e) => {
         if (!drawing) return;
         const p = getPos(e);
-        padCtx.lineTo(p.x, p.y);
+        const midX = (lastPoint.x + p.x) / 2;
+        const midY = (lastPoint.y + p.y) / 2;
+        padCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, midX, midY);
         padCtx.stroke();
+        lastPoint = p;
         e.preventDefault?.();
       };
 
       const end = (e) => {
         drawing = false;
+        lastPoint = null;
         e.preventDefault?.();
       };
 
@@ -434,10 +436,14 @@
       el.pad.addEventListener("pointermove", move);
       el.pad.addEventListener("pointerup", end);
       el.pad.addEventListener("pointercancel", end);
+      el.pad.addEventListener("pointerleave", end);
     }
 
     function clearPad() {
       padCtx.clearRect(0, 0, el.pad.width, el.pad.height);
+      padCtx.fillStyle = "#fff";
+      padCtx.fillRect(0, 0, el.pad.width, el.pad.height);
+      padCtx.strokeStyle = "#000";
       lastPreparedImage = "";
       el.ocrStatus.textContent = "";
     }
@@ -550,7 +556,7 @@
     function setFlow(flow) {
       state.currentFlow = flow;
       el.actionStage.classList.toggle("hidden", flow !== "actions");
-      el.writingStage.classList.toggle("hidden", flow !== "writing");
+      el.writingStage.classList.remove("hidden");
       el.manualStage.classList.toggle("hidden", flow !== "manual");
       el.dontKnowStage.classList.toggle("hidden", flow !== "dontKnow");
       persistIfNeeded();
@@ -570,8 +576,6 @@
 
       el.summary.innerHTML = "";
       el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
-      el.lineText.textContent = task.lineText;
-      el.speakHint.textContent = `朗读内容：${getSpeakText(task)}`;
       el.resultFlash.innerHTML = "";
       el.ocrStatus.textContent = "";
       el.reviewImage.src = "";
@@ -619,11 +623,6 @@
       const task = currentTask();
       if (!task) return;
       speak(getSpeakText(task));
-    }
-
-    function writeAnswer() {
-      setFlow("writing");
-      replayCurrent();
     }
 
     function showFlash(html) {
@@ -680,7 +679,7 @@
           return;
         }
 
-        el.ocrStatus.textContent = `OCR 识别：${allHan.join("") || "（无汉字）"}，无法确认正确，进入手动检查。`;
+        el.ocrStatus.textContent = `OCR 识别：${hanText || "（无汉字）"}，无法确认正确，进入手动检查。`;
         state.pendingManual = {
           image: prepared.dataUrl,
           recognized,
@@ -726,15 +725,24 @@
       });
     }
 
+    let dontKnowTimer = null;
+
     function markDontKnow() {
       const task = currentTask();
       if (!task) return;
+      clearTimeout(dontKnowTimer);
       el.dontKnowChar.textContent = task.targetChar;
       setFlow("dontKnow");
+      dontKnowTimer = setTimeout(() => {
+        if (state.currentFlow === "dontKnow" && currentTask() && currentTask().id === task.id) {
+          nextAfterDontKnow();
+        }
+      }, 1200);
       persistIfNeeded();
     }
 
     function nextAfterDontKnow() {
+      clearTimeout(dontKnowTimer);
       const task = currentTask();
       if (!task) return;
       showFlash(`<div class="warn">这题记为“不会”。正确写法：${escapeHtml(task.targetChar)}</div>`);
@@ -803,6 +811,7 @@
 
     function resetAll() {
       if (!confirm("确定要清空内容和进度吗？")) return;
+      clearTimeout(dontKnowTimer);
       state = {
         sourceText: "",
         allTasks: [],
@@ -816,7 +825,6 @@
       el.input.value = "";
       el.preview.innerHTML = "";
       el.summary.innerHTML = "";
-      el.lineText.textContent = "——";
       el.progress.textContent = "未开始";
       el.score.textContent = "正确：-";
       localStorage.removeItem(LS_KEY);
@@ -864,8 +872,6 @@
               const task = currentTask();
               if (task) {
                 el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
-                el.lineText.textContent = task.lineText;
-                el.speakHint.textContent = `朗读内容：${getSpeakText(task)}`;
                 updateScore();
                 if (state.currentFlow === "manual" && state.pendingManual) {
                   el.reviewImage.src = state.pendingManual.image || "";
@@ -888,12 +894,10 @@
     el.exitPractice.addEventListener("click", () => setMode(false));
 
     el.replayBtn.addEventListener("click", replayCurrent);
-    el.writeBtn.addEventListener("click", writeAnswer);
     el.dontKnowBtn.addEventListener("click", markDontKnow);
     el.clearPad.addEventListener("click", clearPad);
     el.replayWriteBtn.addEventListener("click", replayCurrent);
     el.submitOCR.addEventListener("click", submitOCR);
-    el.backToActionsBtn.addEventListener("click", () => setFlow("actions"));
     el.manualRightBtn.addEventListener("click", manualMarkRight);
     el.manualWrongBtn.addEventListener("click", manualMarkWrong);
     el.nextAfterDontKnowBtn.addEventListener("click", nextAfterDontKnow);
