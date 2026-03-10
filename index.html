@@ -51,6 +51,14 @@
     .summaryMeta { line-height:1.5; }
     .summaryChar { font-size:28px; }
 
+
+    .padSuccessFlash { animation: padSuccessFlash 0.55s ease; }
+    @keyframes padSuccessFlash {
+      0% { box-shadow: 0 0 0 0 rgba(80, 200, 120, 0.0); border-color:#ccc; }
+      25% { box-shadow: 0 0 0 6px rgba(80, 200, 120, 0.18); border-color:#7edc98; }
+      100% { box-shadow: 0 0 0 0 rgba(80, 200, 120, 0.0); border-color:#ccc; }
+    }
+
   </style>
 </head>
 <body>
@@ -250,7 +258,8 @@
       results: [],
       finished: false,
       currentFlow: "actions",
-      pendingManual: null
+      pendingManual: null,
+      streak: 0
     };
 
     function toast(msg) {
@@ -612,7 +621,8 @@
         results: [],
         finished: false,
         currentFlow: "actions",
-        pendingManual: null
+        pendingManual: null,
+      streak: 0
       };
       el.summary.innerHTML = "";
       setMode(true);
@@ -634,6 +644,35 @@
       speak(getSpeakText(task));
     }
 
+
+    function speakImmediate(text) {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "zh-CN";
+      u.rate = Number(el.rate.value);
+      u.pitch = Number(el.pitch.value);
+      window.speechSynthesis.speak(u);
+    }
+
+    function flashPadSuccess() {
+      el.pad.classList.remove("padSuccessFlash");
+      void el.pad.offsetWidth;
+      el.pad.classList.add("padSuccessFlash");
+      setTimeout(() => el.pad.classList.remove("padSuccessFlash"), 600);
+    }
+
+    function getSuccessFeedback() {
+      const s = state.streak || 0;
+      if (s === 3) {
+        return { text: "3连胜！你太棒了！", speech: "3连胜！你太棒了！" };
+      }
+      if (s >= 10 && s % 10 === 0) {
+        return { text: `${s}连胜！你是最聪明的卡皮巴拉！`, speech: `${s}连胜！你是最聪明的卡皮巴拉！` };
+      }
+      return { text: "对了 ✅", speech: "对了" };
+    }
+
     function showFlash(html) {
       el.resultFlash.innerHTML = html;
     }
@@ -641,6 +680,15 @@
     function recordAndAdvance(result, extra = {}) {
       const task = currentTask();
       if (!task) return;
+
+      if (result === "correct") {
+        if (!extra.noStreak) {
+          state.streak = (state.streak || 0) + 1;
+        }
+      } else {
+        state.streak = 0;
+      }
+
       state.results.push({
         taskId: task.id,
         lineText: task.lineText,
@@ -648,9 +696,11 @@
         charIndex: task.charIndex,
         lineNo: task.lineNo,
         result,
+        streakAtThatMoment: state.streak,
         ...extra
       });
       persistIfNeeded();
+
       setTimeout(() => {
         if (state.idx >= state.tasks.length - 1) {
           finishPractice();
@@ -658,7 +708,7 @@
           state.idx += 1;
           renderTask();
         }
-      }, 220);
+      }, result === "correct" ? 650 : 220);
     }
 
     async function submitOCR() {
@@ -679,7 +729,12 @@
 
         if (exact) {
           el.ocrStatus.textContent = `OCR 识别：${allHan.join("") || "（无汉字）"}，判断为正确。`;
-          showFlash(`<div class="ok">写对了 ✅</div>`);
+          state.streak = (state.streak || 0) + 1;
+          const feedback = getSuccessFeedback();
+          showFlash(`<div class="ok">${feedback.text}</div>`);
+          flashPadSuccess();
+          speakImmediate(feedback.speech);
+          state.streak -= 1;
           recordAndAdvance("correct", {
             method: "ocr",
             recognized,
@@ -715,12 +770,16 @@
     function manualMarkRight() {
       const pending = state.pendingManual;
       if (!pending) return;
-      showFlash(`<div class="ok">已标记：写对了 ✅</div>`);
+      showFlash(`<div class="ok">已确认 ✅</div>`);
+      flashPadSuccess();
+      speakImmediate("已确认");
       recordAndAdvance("correct", {
         method: "manual",
         recognized: pending.recognized || "",
-        image: pending.image
+        image: pending.image,
+        noStreak: true
       });
+    });
     }
 
     function manualMarkWrong() {
@@ -769,7 +828,7 @@
 
       const buildSimpleList = (items) => {
         if (!items.length) return "";
-        return `<ul>${items.map(r => `<li>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字 “${escapeHtml(r.targetChar)}”</li>`).join("")}</ul>`;
+        return `<ul>${items.map(r => `<li>${escapeHtml(r.lineText)} ${escapeHtml(r.targetChar)}</li>`).join("")}</ul>`;
       };
 
       const buildManualReview = (items) => {
@@ -780,9 +839,13 @@
               <div class="summaryItem">
                 <img class="summaryThumb" src="${r.image || ""}" alt="handwriting" />
                 <div class="summaryMeta">
-                  <div>${escapeHtml(r.lineText)} → 第 ${r.charIndex} 个字</div>
-                  <div class="summaryChar">“${escapeHtml(r.targetChar)}”</div>
+                  <div class="summaryChar">${escapeHtml(r.targetChar)}</div>
+                  <div style="margin-top:6px;">
+                    <button class="revOk" data-id="${r.taskId}">确认写对</button>
+                    <button class="revWrong" data-id="${r.taskId}">改成写错</button>
+                  </div>
                 </div>
+              </div>
               </div>
             `).join("")}
           </div>
@@ -808,10 +871,6 @@
             <span class="pill">正确率：${pct}%</span>
           </div>
 
-          <div style="margin-top:12px;">
-            <div class="muted">写对了（自动识别 / 自动确认）：</div>
-            ${autoCorrect.length ? buildSimpleList(autoCorrect) : `<div class="ok" style="margin-top:8px;">没有这类项目 ✅</div>`}
-          </div>
 
           <div style="margin-top:12px;">
             <div class="muted">写错了：</div>
@@ -865,7 +924,8 @@
         results: [],
         finished: false,
         currentFlow: "actions",
-        pendingManual: null
+        pendingManual: null,
+      streak: 0
       };
       el.input.value = "";
       el.preview.innerHTML = "";
