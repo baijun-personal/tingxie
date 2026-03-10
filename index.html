@@ -112,6 +112,25 @@
         <button class="danger" id="resetAll">清空/重置</button>
       </div>
 
+      <div class="card" style="margin-top:12px;">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <div>3) 错题本</div>
+            <div class="muted">连续答对 3 次会自动移出错题本</div>
+          </div>
+          <span id="wrongBookCount" class="pill">错题本：0</span>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label class="muted">抽题数量
+            <input id="wrongBookSize" type="number" min="1" max="200" step="1" value="20" style="width:72px;" />
+          </label>
+          <button id="startWrongBook">开始错题本练习</button>
+          <button id="viewWrongBook">查看错题本</button>
+          <button class="danger" id="clearWrongBook">清空错题本</button>
+        </div>
+        <div id="wrongBookPreview" class="muted" style="margin-top:8px;"></div>
+      </div>
+
       <div id="preview" class="muted" style="margin-top:10px;"></div>
     </div>
 
@@ -227,6 +246,12 @@
     previewBtn: $("previewBtn"),
     preview: $("preview"),
     resetAll: $("resetAll"),
+    wrongBookCount: $("wrongBookCount"),
+    wrongBookSize: $("wrongBookSize"),
+    startWrongBook: $("startWrongBook"),
+    viewWrongBook: $("viewWrongBook"),
+    clearWrongBook: $("clearWrongBook"),
+    wrongBookPreview: $("wrongBookPreview"),
 
     progress: $("progress"),
     score: $("score"),
@@ -260,14 +285,18 @@
     revealed: false,
     results: [],
     finished: false,
+    sessionMode: "normal",
 
     // spot-check
-    pendingCheck: null, // { targetChar, itemText, reason }
+    pendingCheck: null, // { targetChar, itemText, reason, wrongBookKey? }
     flags: [], // [{ idx, itemText, targetChar, gotChar, ok, ts }]
+    manualChecks: [],
   };
 
-  const LS_KEY = "tingxie_v3_state";
-  const LS_TEXT = "tingxie_v3_text";
+  const LS_KEY = "tingxie_v4_state";
+  const LS_TEXT = "tingxie_v4_text";
+  const LS_WRONG_BOOK = "tingxie_v4_wrong_book";
+  const LS_WRONG_BOOK_SIZE = "tingxie_v4_wrong_book_size";
 
   let toastTimer = null;
   function toast(msg) {
@@ -302,7 +331,8 @@
   function setMode(isPractice) {
     document.body.classList.toggle("practice", !!isPractice);
     el.exitPractice.style.display = isPractice ? "inline-block" : "none";
-    el.modePill.textContent = isPractice ? "模式：练习中" : "模式：准备";
+    const label = !isPractice ? "模式：准备" : (state.sessionMode === "wrongbook" ? "模式：错题本练习" : "模式：练习中");
+    el.modePill.textContent = label;
     persistIfNeeded();
   }
 
@@ -386,8 +416,145 @@ function segmentChinese(text) {
     return "";
   }
 
+  function currentEntry() {
+    const raw = state.items[state.idx];
+    if (!raw) return null;
+    if (typeof raw === "string") {
+      const picked = pickMostStrokesChar(raw);
+      return { itemText: raw, targetChar: picked?.ch || firstHanChar(raw), wrongBookKey: buildWrongBookKey(picked?.ch || firstHanChar(raw), raw) };
+    }
+    return raw;
+  }
+
   function currentText() {
-    return state.items[state.idx] || "";
+    const entry = currentEntry();
+    return entry?.itemText || "";
+  }
+
+  function currentTargetChar() {
+    const entry = currentEntry();
+    return entry?.targetChar || "";
+  }
+
+  function buildWrongBookKey(char, itemText) {
+    return `${char || ""}||${itemText || ""}`;
+  }
+
+  function loadWrongBook() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LS_WRONG_BOOK) || "{}");
+      return raw && typeof raw === "object" ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveWrongBook(book) {
+    localStorage.setItem(LS_WRONG_BOOK, JSON.stringify(book || {}));
+    updateWrongBookUI();
+  }
+
+  function getWrongBookValues() {
+    const book = loadWrongBook();
+    return Object.values(book).filter(Boolean);
+  }
+
+  function addWrongBookRecord(char, itemText) {
+    if (!char || !itemText) return;
+    const book = loadWrongBook();
+    const key = buildWrongBookKey(char, itemText);
+    const now = Date.now();
+    const entry = book[key] || {
+      key,
+      char,
+      itemText,
+      correctStreak: 0,
+      totalRight: 0,
+      totalWrong: 0,
+      addedAt: now,
+      updatedAt: now,
+    };
+    entry.char = char;
+    entry.itemText = itemText;
+    entry.totalWrong = Number(entry.totalWrong || 0) + 1;
+    entry.correctStreak = 0;
+    entry.updatedAt = now;
+    book[key] = entry;
+    saveWrongBook(book);
+  }
+
+  function markWrongBookRight(key) {
+    if (!key) return;
+    const book = loadWrongBook();
+    const entry = book[key];
+    if (!entry) return;
+    entry.totalRight = Number(entry.totalRight || 0) + 1;
+    entry.correctStreak = Number(entry.correctStreak || 0) + 1;
+    entry.updatedAt = Date.now();
+    if (entry.correctStreak >= 3) {
+      delete book[key];
+    } else {
+      book[key] = entry;
+    }
+    saveWrongBook(book);
+  }
+
+  function getWrongBookPracticeSize() {
+    const raw = Number(localStorage.getItem(LS_WRONG_BOOK_SIZE) || el.wrongBookSize?.value || 20);
+    return Math.max(1, Math.min(200, Number.isFinite(raw) ? raw : 20));
+  }
+
+  function setWrongBookPracticeSize(v) {
+    const size = Math.max(1, Math.min(200, Number(v) || 20));
+    localStorage.setItem(LS_WRONG_BOOK_SIZE, String(size));
+    if (el.wrongBookSize) el.wrongBookSize.value = String(size);
+  }
+
+  function updateWrongBookUI(showList = false) {
+    const rows = getWrongBookValues();
+    if (el.wrongBookCount) {
+      el.wrongBookCount.textContent = `错题本：${rows.length}`;
+    }
+    if (!el.wrongBookPreview) return;
+    if (!rows.length) {
+      el.wrongBookPreview.innerHTML = "当前没有错题。";
+      return;
+    }
+    if (!showList) {
+      const sample = rows.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 5);
+      el.wrongBookPreview.innerHTML = `最近错题：${sample.map(x => `<span class="pill">${escapeHtml(x.char)}｜${escapeHtml(x.itemText)}</span>`).join(" ")}`;
+      return;
+    }
+    const list = rows.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    el.wrongBookPreview.innerHTML = `
+      <div class="card" style="margin:0;">
+        <div class="muted">错题本明细（共 ${list.length} 条）</div>
+        <ul class="list">${list.map(x => `<li>${escapeHtml(x.char)}｜${escapeHtml(x.itemText)}｜连对 ${Number(x.correctStreak || 0)} 次｜错 ${Number(x.totalWrong || 0)} 次</li>`).join("")}</ul>
+      </div>
+    `;
+  }
+
+  function buildPracticeEntries(items) {
+    return (items || []).map((itemText) => {
+      const text = String(itemText || "").trim();
+      const picked = pickMostStrokesChar(text);
+      const targetChar = picked?.ch || firstHanChar(text);
+      return {
+        itemText: text,
+        targetChar,
+        wrongBookKey: buildWrongBookKey(targetChar, text),
+      };
+    }).filter(x => x.itemText && x.targetChar);
+  }
+
+  function buildWrongBookPracticeEntries(size) {
+    const rows = getWrongBookValues();
+    const shuffled = rows.slice().sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, Math.min(size, shuffled.length)).map((row) => ({
+      itemText: row.itemText,
+      targetChar: row.char,
+      wrongBookKey: row.key || buildWrongBookKey(row.char, row.itemText),
+    }));
   }
 
   // =========================
@@ -671,15 +838,19 @@ cimg.data.set(outD);
     // configurable probability (default 25%)
     if (Math.random() >= getSpotProb()) return false;
 
-    const itemText = currentText();
-    const picked = pickMostStrokesChar(itemText);
-    if (!picked || !picked.ch) return false;
+    const entry = currentEntry();
+    const itemText = entry?.itemText || currentText();
+    const targetChar = entry?.targetChar || "";
+    if (!targetChar) return false;
 
-    state.pendingCheck = { targetChar: picked.ch, itemText, reason: `最多笔画（约 ${picked.strokes} 画）` };
+    const picked = pickMostStrokesChar(itemText);
+    const strokes = picked?.strokes || fetchStrokeCount(targetChar) || 0;
+
+    state.pendingCheck = { targetChar, itemText, wrongBookKey: entry?.wrongBookKey || buildWrongBookKey(targetChar, itemText), reason: `本题目标字（约 ${strokes} 画）` };
     el.checkPrompt.textContent = "抽查：请写（听语音提示）";
     // 语音提示要写的字（不在屏幕上显示，避免直接抄）
     speak(`请写${picked.ch}`);
-    el.checkNote.textContent = `规则：从本题里选笔画最多的前 5 个字中随机抽 1 个（${picked.strokes || "?"} 画）`;
+    el.checkNote.textContent = `规则：本题检查字为“${targetChar}”（约 ${strokes || "?"} 画）`;
     el.ocrResult.textContent = "";
     // avoid accidental taps selecting text on mobile
     lockTap(260);
@@ -749,9 +920,15 @@ cimg.data.set(outD);
       });
     }
 
+    if (ok && state.sessionMode === "wrongbook") {
+      markWrongBookRight(state.pendingCheck.wrongBookKey);
+    }
+    if (!ok) {
+      addWrongBookRecord(expected, state.pendingCheck.itemText);
+    }
+
     persistIfNeeded();
 
-    // If failed, highlight for later: we still allow progress, but keep a clear record
     toast(ok ? "抽查通过 ✅" : "抽查待复核（已记录）");
 
     state.pendingCheck = null;
@@ -861,11 +1038,14 @@ persistIfNeeded();
       return;
     }
 
-    const text = currentText();
+    const entry = currentEntry();
+    const text = entry?.itemText || currentText();
+    const targetChar = entry?.targetChar || currentTargetChar();
+    const wrongBookKey = entry?.wrongBookKey || buildWrongBookKey(targetChar, text);
 
-    // If marked wrong, behave as before
     if (!correct) {
       state.results[state.idx] = { text, correct: false };
+      addWrongBookRecord(targetChar, text);
       toast("已标记：错 ❌");
       setMarkedPill();
       updateScorePill();
@@ -874,8 +1054,6 @@ persistIfNeeded();
       return;
     }
 
-    // Marked right: 20% chance to trigger spot check
-    // We temporarily mark as correct, but final verification is recorded in flags (for parents).
     state.results[state.idx] = { text, correct: true };
     toast("已标记：对 ✅");
     setMarkedPill();
@@ -884,8 +1062,10 @@ persistIfNeeded();
 
     maybeTriggerSpotCheckOnMarkRight().then((triggered) => {
       if (triggered) {
-        // Don't auto-next; wait for OCR submit/skip
         return;
+      }
+      if (state.sessionMode === "wrongbook") {
+        markWrongBookRight(wrongBookKey);
       }
       setTimeout(() => next(), 150);
     });
@@ -931,6 +1111,7 @@ persistIfNeeded();
           <span class="pill ok">对：${ok}</span>
           <span class="pill bad">错：${answered.length - ok}</span>
           <span class="pill">正确率：${pct}%</span>
+          <span class="pill">错题本：${getWrongBookValues().length}</span>
         </div>
         ${wrongs.length ? `<div style="margin-top:10px;"><div class="muted">错题（建议再练）：</div><ul class="list">${wrongs.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : `<div style="margin-top:10px;" class="ok">没有错题 ✅</div>`}
         ${unmarked.length ? `<div style="margin-top:10px;"><div class="muted">未标记对错的题：</div><ul class="list">${unmarked.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ``}
@@ -955,9 +1136,9 @@ persistIfNeeded();
   }
 
 
-  function restartWithItems(items) {
+  function restartWithItems(items, sessionMode = "normal") {
     if (el.answerControls) el.answerControls.style.display = "";
-    const list = (items || []).map(x => String(x).trim()).filter(Boolean);
+    const list = Array.isArray(items) ? items.filter(Boolean) : [];
     if (!list.length) {
       toast("没有可练的题目");
       return;
@@ -967,7 +1148,9 @@ persistIfNeeded();
     state.revealed = false;
     state.results = new Array(list.length).fill(null);
     state.finished = false;
+    state.sessionMode = sessionMode;
     el.summary.innerHTML = "";
+    setMode(true);
     renderQuestion();
     persistIfNeeded();
   }
@@ -997,12 +1180,12 @@ function startWithMistakes() {
       toast("没有错题 ✅");
       return;
     }
-    restartWithItems(uniq);
+    restartWithItems(buildPracticeEntries(uniq), "normal");
   }
 
   function retryAll() {
     clearReviewForNewRound();
-    restartWithItems(state.items || []);
+    restartWithItems((state.items || []).map(x => typeof x === "string" ? x : x.itemText).map(String), "normal");
   }
 
   function escapeHtml(s) {
@@ -1068,6 +1251,7 @@ function startWithMistakes() {
   function restoreIfNeeded() {
     try {
       setPills();
+      setWrongBookPracticeSize(getWrongBookPracticeSize());
 
       const savedText = localStorage.getItem(LS_TEXT);
       if (savedText) el.input.value = savedText;
@@ -1079,14 +1263,18 @@ function startWithMistakes() {
         state.revealed = !!state.revealed;
         state.results = Array.isArray(state.results) ? state.results : [];
         state.finished = !!state.finished;
+        state.sessionMode = state.sessionMode || "normal";
+        state.flags = Array.isArray(state.flags) ? state.flags : [];
+        state.manualChecks = Array.isArray(state.manualChecks) ? state.manualChecks : [];
         renderQuestion();
-        setMode(!!raw.practice); // 恢复练习模式（如果上次在练）
+        setMode(!!raw.practice);
       } else {
         setMode(false);
       }
     } catch (e) {
       setMode(false);
     }
+    updateWrongBookUI();
   }
 
   function start() {
@@ -1103,15 +1291,19 @@ function startWithMistakes() {
     }
 
     state = {
-      items: maybeShuffle(items),
+      items: buildPracticeEntries(maybeShuffle(items)),
       idx: 0,
       revealed: false,
       results: new Array(items.length).fill(null),
       finished: false,
+      sessionMode: "normal",
+      pendingCheck: null,
+      flags: [],
+      manualChecks: [],
     };
 
     el.summary.innerHTML = "";
-    setMode(true);          // 关键：进入练习模式，隐藏输入区
+    setMode(true);
     renderQuestion();
   }
 
@@ -1128,22 +1320,50 @@ function startWithMistakes() {
     `;
   }
 
+
+  function startWrongBookPractice() {
+    const size = getWrongBookPracticeSize();
+    const entries = buildWrongBookPracticeEntries(size);
+    if (!entries.length) {
+      toast("错题本为空");
+      return;
+    }
+    clearReviewForNewRound();
+    restartWithItems(entries, "wrongbook");
+  }
+
+  function viewWrongBook() {
+    updateWrongBookUI(true);
+  }
+
+  function clearWrongBook() {
+    if (!confirm("确定要清空错题本吗？")) return;
+    localStorage.removeItem(LS_WRONG_BOOK);
+    updateWrongBookUI();
+    toast("已清空错题本");
+  }
+
   function resetAll() {
     if (el.answerControls) el.answerControls.style.display = "";
     if (!confirm("确定要清空内容和进度吗？")) return;
-    state = { items: [], idx: 0, revealed: false, results: [], finished: false };
+    state = { items: [], idx: 0, revealed: false, results: [], finished: false, sessionMode: "normal", pendingCheck: null, flags: [], manualChecks: [] };
     el.input.value = "";
     el.preview.innerHTML = "";
     el.summary.innerHTML = "";
     setMode(false); // 退出练习模式，显示输入区
     renderQuestion();
     localStorage.removeItem(LS_KEY);
-    localStorage.removeItem(LS_TEXT);  }
+    localStorage.removeItem(LS_TEXT);
+    localStorage.removeItem(LS_WRONG_BOOK);
+    updateWrongBookUI();  }
 
   // events
   el.start.addEventListener("click", start);
   el.previewBtn.addEventListener("click", preview);
   el.resetAll.addEventListener("click", resetAll);
+  el.startWrongBook?.addEventListener("click", startWrongBookPractice);
+  el.viewWrongBook?.addEventListener("click", viewWrongBook);
+  el.clearWrongBook?.addEventListener("click", clearWrongBook);
 
   el.exitPractice.addEventListener("click", () => setMode(false));
 
@@ -1160,6 +1380,7 @@ function startWithMistakes() {
   el.rate.addEventListener("input", () => { setPills(); persistIfNeeded(); });
   el.pitch.addEventListener("input", () => { setPills(); persistIfNeeded(); });
   el.remember.addEventListener("change", persistIfNeeded);
+  el.wrongBookSize?.addEventListener("change", () => setWrongBookPracticeSize(el.wrongBookSize.value));
 
   // spot-check probability control (0-100), persisted in localStorage
   if (el.spotProb) {
@@ -1199,6 +1420,7 @@ if (el.repeatCheckAudio) el.repeatCheckAudio.addEventListener("click", repeatChe
         ts: Date.now(),
         reason: "跳过抽查（需家长复核）",
       });
+      addWrongBookRecord(state.pendingCheck.targetChar, state.pendingCheck.itemText);
       toast("已跳过抽查（已记录）");
       state.pendingCheck = null;
       showCheckUI(false);
