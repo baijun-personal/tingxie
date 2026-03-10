@@ -145,7 +145,7 @@
       padding: 14px;
     }
     .recognizedText, .answerText {
-      font-size: 24px;
+      font-size: 30px;
       line-height: 1.5;
       margin-top: 6px;
       word-break: break-word;
@@ -225,7 +225,7 @@
       <div id="previewWrap" class="previewList"></div>
     </div>
 
-    <div class="card" id="practiceCard">
+    <div class="card hidden" id="practiceCard">
       <div class="sectionTitle">2) 练习区</div>
       <div class="stageWrap">
         <div>
@@ -287,6 +287,8 @@
         clearBtn: $('clearBtn'),
         parseInfo: $('parseInfo'),
         previewWrap: $('previewWrap'),
+        inputCard: $('inputCard'),
+        practiceCard: $('practiceCard'),
         progressPill: $('progressPill'),
         scorePill: $('scorePill'),
         promptText: $('promptText'),
@@ -318,7 +320,10 @@
         recognition: null,
         isListening: false,
         speechApiSupported: false,
-        sessionId: null
+        sessionId: null,
+        recognitionHandled: false,
+        recognitionFallbackTimer: null,
+        suppressNextError: false
       };
 
       function uid() {
@@ -356,6 +361,17 @@
             els.inputText.value = data.rawText;
           }
         } catch (_) {}
+      }
+
+
+      function showInputPage() {
+        els.inputCard.classList.remove('hidden');
+        els.practiceCard.classList.add('hidden');
+      }
+
+      function showPracticePage() {
+        els.inputCard.classList.add('hidden');
+        els.practiceCard.classList.remove('hidden');
       }
 
       function showToast(msg) {
@@ -490,6 +506,8 @@
       }
 
       function renderAll() {
+        if (state.mode === 'input') showInputPage();
+        else showPracticePage();
         applyModePill();
         renderPrompt();
         updateProgressPill();
@@ -562,8 +580,18 @@
         renderAll();
       }
 
+
+      function clearRecognitionFallbackTimer() {
+        if (state.recognitionFallbackTimer) {
+          clearTimeout(state.recognitionFallbackTimer);
+          state.recognitionFallbackTimer = null;
+        }
+      }
+
       function stopRecognitionIfNeeded() {
+        clearRecognitionFallbackTimer();
         if (state.recognition && state.isListening) {
+          state.suppressNextError = true;
           try { state.recognition.stop(); } catch (_) {}
         }
         state.isListening = false;
@@ -584,20 +612,32 @@
 
         rec.onstart = () => {
           state.isListening = true;
+          state.recognitionHandled = false;
           renderAll();
         };
 
         rec.onend = () => {
+          const wasListening = state.isListening;
           state.isListening = false;
+          clearRecognitionFallbackTimer();
+          if (wasListening && state.mode === 'practicing' && !state.recognitionHandled) {
+            processRecognitionResult('');
+          }
           if (state.mode === 'practicing') renderAll();
         };
 
         rec.onerror = (event) => {
-          state.isListening = false;
-          renderAll();
           const code = event && event.error ? event.error : '识别失败';
-          processRecognitionResult('');
-          showToast('识别状态：' + code);
+          const shouldIgnore = state.suppressNextError && (code === 'aborted' || code === 'no-speech');
+          state.suppressNextError = false;
+          state.isListening = false;
+          clearRecognitionFallbackTimer();
+          if (!shouldIgnore && state.mode === 'practicing' && !state.recognitionHandled) {
+            processRecognitionResult('');
+            showToast('识别状态：' + code);
+          } else {
+            renderAll();
+          }
         };
 
         rec.onresult = (event) => {
@@ -608,6 +648,7 @@
               .join('')
               .trim();
           } catch (_) {}
+          state.recognitionHandled = true;
           processRecognitionResult(text);
         };
 
@@ -624,7 +665,15 @@
           return;
         }
         try {
+          state.recognitionHandled = false;
+          state.suppressNextError = false;
+          clearRecognitionFallbackTimer();
           state.recognition.start();
+          state.recognitionFallbackTimer = setTimeout(() => {
+            if (state.isListening) {
+              stopRecognitionIfNeeded();
+            }
+          }, 8000);
         } catch (_) {
           showToast('录音暂时无法启动，请再点一次');
         }
