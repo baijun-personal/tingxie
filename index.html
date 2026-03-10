@@ -555,8 +555,9 @@
 
     function setFlow(flow) {
       state.currentFlow = flow;
-      el.actionStage.classList.toggle("hidden", flow !== "actions");
-      el.writingStage.classList.remove("hidden");
+      const showMain = flow === "actions";
+      el.actionStage.classList.toggle("hidden", !showMain);
+      el.writingStage.classList.toggle("hidden", !showMain);
       el.manualStage.classList.toggle("hidden", flow !== "manual");
       el.dontKnowStage.classList.toggle("hidden", flow !== "dontKnow");
       persistIfNeeded();
@@ -733,11 +734,7 @@
       clearTimeout(dontKnowTimer);
       el.dontKnowChar.textContent = task.targetChar;
       setFlow("dontKnow");
-      dontKnowTimer = setTimeout(() => {
-        if (state.currentFlow === "dontKnow" && currentTask() && currentTask().id === task.id) {
-          nextAfterDontKnow();
-        }
-      }, 1200);
+      // 不自动进入下一题，由用户点击“下一题”
       persistIfNeeded();
     }
 
