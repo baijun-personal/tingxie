@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>中文听写练习</title>
   <style>
+
+@font-face {
+  font-family: "WordKaiTi";
+  src: url("simkai.ttf") format("truetype");
+}
+
     body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 16px; line-height: 1.45; color:#111; }
     h1 { font-size: 20px; margin: 0; }
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
@@ -24,12 +30,12 @@
     .hidden { display:none !important; }
     .big { font-size:28px; }
     .prompt { font-size:22px; line-height:1.5; margin-top:8px; }
-     .kaitiCorrect{font-family: "KaiTi", "Kaiti SC", "FangSong", serif;}
+     .kaitiCorrect{font-family: "WordKaiTi","KaiTi","Kaiti SC","FangSong",serif;}
 .target { font-size:48px; text-align:center; line-height:1; }
     .manualCompare { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:stretch; margin-top:12px; }
     .compareBox { border:1px solid #ddd; border-radius:12px; padding:10px; background:#fafafa; min-height:220px; display:flex; flex-direction:column; }
     .compareTitle { font-size:13px; color:#666; margin-bottom:8px; }
-    .handWrap, .charWrap { flex:1; display:flex; align-items:center; justify-content:center; }
+    .handWrap, .charWrap { flex:1; display:flex; align-items:center; justify-content:center; font-family:"WordKaiTi","KaiTi","Kaiti SC","FangSong",serif; }
     .charWrap { font-size:160px; background:#fff; border:1px solid #eee; border-radius:12px; }
     #reviewImage { max-width:100%; max-height:280px; border:1px solid #eee; border-radius:12px; background:#fff; }
     #pad { border:1px solid #ccc; border-radius:12px; background:#fff; touch-action:none; }
@@ -85,10 +91,7 @@
       <textarea id="input" placeholder="检查视力 1&#10;表演结束 1,2,3&#10;布置课堂"></textarea>
 
       <div class="row" style="margin-top:10px;">
-        <label class="muted">
-          <input id="remember" type="checkbox" checked />
-          记住内容与进度
-        </label>
+        
         <label class="muted">语速
           <input id="rate" type="range" min="0.6" max="1.2" step="0.05" value="0.95" />
           <span id="rateVal" class="pill"></span>
