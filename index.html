@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习（网页单文件版）v_fixed</h1>
+      <h1>中文听写练习（网页单文件版）v_fixed2</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -102,9 +102,9 @@
       </div>
 
       <div class="row">
-        <button class="primary" id="start">开始练习</button><button onclick="startLastWrongPractice()">上次错题练习</button>
-        <button id="previewBtn">检查格式</button>
-        <button id="resetAll">清空/重置</button>
+        <button type="button" class="primary" id="start">开始练习</button><button type="button" id="startLastWrongBtn">上次错题练习</button>
+        <button type="button" id="previewBtn">检查格式</button>
+        <button type="button" id="resetAll">清空/重置</button>
       </div>
 
       <div class="wrongbookBar">
@@ -237,6 +237,7 @@
       rateVal: $("rateVal"),
       pitchVal: $("pitchVal"),
       start: $("start"),
+      startLastWrongBtn: $("startLastWrongBtn"),
       previewBtn: $("previewBtn"),
       preview: $("preview"),
       resetAll: $("resetAll"),
@@ -275,6 +276,7 @@
     const LS_KEY = "tingxie_v4_structured";
     const LS_TEXT = "tingxie_v4_text";
     const WRONGBOOK_KEY = "tingxie_wrongbook_v1";
+    const LAST_WRONG_KEY = "tingxie_last_wrong_v1";
 
     let toastTimer = null;
     let padCtx = null;
@@ -363,6 +365,33 @@
         </div>
       `).join('');
     }
+
+    
+function saveLastWrongTasks(tasks) {
+      try {
+        localStorage.setItem(LAST_WRONG_KEY, JSON.stringify(Array.isArray(tasks) ? tasks : []));
+      } catch (e) {}
+    }
+
+    function loadLastWrongTasks() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(LAST_WRONG_KEY) || "[]");
+        return Array.isArray(raw) ? raw : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function startLastWrongPractice() {
+      const tasks = loadLastWrongTasks();
+      if (!tasks.length) {
+        toast("还没有保存的上次错题");
+        return;
+      }
+      startPractice(tasks, el.input.value || state.sourceText || "", "lastwrong");
+    }
+
+    window.startLastWrongPractice = startLastWrongPractice;
 
     function renderWrongBookSummary() {
       const items = loadWrongBook();
@@ -1090,6 +1119,7 @@
 
       if (retryWrongBtn) {
         retryWrongBtn.addEventListener("click", () => {
+          saveLastWrongTasks(retryTasks);
           startPractice(retryTasks, state.sourceText, state.practiceType || "normal");
         });
       }
@@ -1180,6 +1210,7 @@
       } catch (e) {}
     }
 
+    if (el.startLastWrongBtn) el.startLastWrongBtn.addEventListener("click", startLastWrongPractice);
     el.previewBtn.addEventListener("click", renderFormatCheck);
     el.start.addEventListener("click", beginFromInput);
     el.resetAll.addEventListener("click", resetAll);
