@@ -449,6 +449,11 @@
       pauseForRewardMs: 1200,
     };
 
+
+    const STORAGE_KEYS = {
+      sourceText: 'beisong_app_source_text_v1'
+    };
+
     const els = {
       inputScreen: document.getElementById('inputScreen'),
       practiceScreen: document.getElementById('practiceScreen'),
@@ -480,6 +485,22 @@
       summaryList: document.getElementById('summaryList'),
     };
 
+
+    function saveSourceText() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.sourceText, els.sourceText.value || '');
+      } catch (_) {}
+    }
+
+    function loadSourceText() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEYS.sourceText);
+        if (typeof saved === 'string' && saved) {
+          els.sourceText.value = saved;
+        }
+      } catch (_) {}
+    }
+
     function showScreen(name) {
       state.mode = name;
       els.inputScreen.classList.toggle('active', name === 'input');
@@ -488,6 +509,7 @@
     }
 
     function parseLines() {
+      saveSourceText();
       return els.sourceText.value
         .split(/\r?\n/)
         .map(s => s.trim())
@@ -544,7 +566,8 @@
       stopSpeaking();
       resetPracticeData();
       showScreen('input');
-      renderPreview();
+      loadSourceText();
+    renderPreview();
     }
 
     function currentTarget() {
@@ -923,6 +946,11 @@
         .replace(/'/g, '&#39;');
     }
 
+    els.sourceText.addEventListener('input', () => {
+      saveSourceText();
+      loadSourceText();
+    renderPreview();
+    });
     els.parseBtn.addEventListener('click', renderPreview);
     els.startBtn.addEventListener('click', startPractice);
     els.exitBtn.addEventListener('click', exitToInput);
@@ -955,6 +983,7 @@
       }
     });
 
+    loadSourceText();
     renderPreview();
   </script>
 </body>
