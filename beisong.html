@@ -306,6 +306,7 @@
             <div class="row">
               <span id="progressPill" class="pill bigPill">未开始</span>
               <span id="scorePill" class="pill bigPill">正确：-</span>
+              <span id="streakPill" class="pill bigPill">连胜：0</span>
             </div>
             <div class="micHint">
               <span id="micDot" class="micDot"></span>
@@ -368,6 +369,7 @@
         practiceCard: $('practiceCard'),
         progressPill: $('progressPill'),
         scorePill: $('scorePill'),
+        streakPill: $('streakPill'),
         promptText: $('promptText'),
         resultBlock: $('resultBlock'),
         resultTitle: $('resultTitle'),
@@ -404,7 +406,12 @@
         recognitionFallbackTimer: null,
         suppressNextError: false,
         recognitionSeq: 0,
-        activeRecognitionSeq: 0
+        activeRecognitionSeq: 0,
+        streak: 0,
+        autoStartTimer: null,
+        speechTimer: null,
+        isSpeaking: false,
+        audioUnlockDone: false
       };
 
       function escapeHtml(s) {
@@ -421,6 +428,78 @@
         els.toast.classList.add('show');
         clearTimeout(showToast.timer);
         showToast.timer = setTimeout(() => els.toast.classList.remove('show'), 1800);
+      }
+
+      function clearAutoStartTimer() {
+        if (state.autoStartTimer) {
+          clearTimeout(state.autoStartTimer);
+          state.autoStartTimer = null;
+        }
+      }
+
+      function clearSpeechTimer() {
+        if (state.speechTimer) {
+          clearTimeout(state.speechTimer);
+          state.speechTimer = null;
+        }
+      }
+
+      function stopSpeakingIfNeeded() {
+        clearSpeechTimer();
+        try {
+          if (window.speechSynthesis) window.speechSynthesis.cancel();
+        } catch (_) {}
+        state.isSpeaking = false;
+      }
+
+      function unlockAudioOnce() {
+        if (state.audioUnlockDone) return;
+        state.audioUnlockDone = true;
+        try {
+          if (window.speechSynthesis) {
+            const u = new SpeechSynthesisUtterance('');
+            u.volume = 0;
+            u.lang = 'zh-CN';
+            window.speechSynthesis.speak(u);
+            window.speechSynthesis.cancel();
+          }
+        } catch (_) {}
+      }
+
+      function speakMessage(text, onDone) {
+        stopSpeakingIfNeeded();
+        state.isSpeaking = true;
+        renderAll();
+        const done = () => {
+          state.isSpeaking = false;
+          clearSpeechTimer();
+          renderAll();
+          if (typeof onDone === 'function') onDone();
+        };
+        try {
+          if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+            state.speechTimer = setTimeout(done, 1200);
+            return;
+          }
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = 'zh-CN';
+          utter.rate = 1;
+          utter.pitch = 1;
+          utter.volume = 1;
+          utter.onend = done;
+          utter.onerror = done;
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utter);
+          state.speechTimer = setTimeout(done, Math.max(1200, text.length * 420));
+        } catch (_) {
+          state.speechTimer = setTimeout(done, 1200);
+        }
+      }
+
+      function rewardTextForStreak(streak) {
+        if (streak > 0 && streak % 10 === 0) return `${streak}连胜！你是最聪明的卡皮巴拉！`;
+        if (streak === 3) return '3连胜！你太棒了！';
+        return '正确';
       }
 
       function normalizeText(text) {
@@ -545,6 +624,10 @@
         els.scorePill.textContent = counted ? `正确：${correct}/${counted}` : '正确：-';
       }
 
+      function updateStreakPill() {
+        els.streakPill.textContent = `连胜：${state.streak}`;
+      }
+
       function updateProgressPill() {
         if (!state.items.length) {
           els.progressPill.textContent = '未开始';
@@ -567,8 +650,10 @@
           els.micHintText.textContent = '请判断这次是否背对';
         } else if (state.mode === 'wrong_wait_continue') {
           els.micHintText.textContent = '请看答案，然后继续';
+        } else if (state.isSpeaking) {
+          els.micHintText.textContent = '正在播放奖励';
         } else if (state.mode === 'practicing') {
-          els.micHintText.textContent = '准备开始';
+          els.micHintText.textContent = '进入下一项后会自动开始录音';
         } else {
           els.micHintText.textContent = '输入内容后开始';
         }
@@ -606,6 +691,21 @@
         els.modePill.textContent = map[state.mode] || '模式：输入';
       }
 
+      function scheduleAutoStart() {
+        clearAutoStartTimer();
+        if (state.mode !== 'practicing') return;
+        if (state.isListening || state.isSpeaking) return;
+        const item = currentItem();
+        const result = state.results[state.currentIndex];
+        if (!item || !result || result.status !== 'pending') return;
+        state.autoStartTimer = setTimeout(() => {
+          state.autoStartTimer = null;
+          if (state.mode === 'practicing' && !state.isListening && !state.isSpeaking) {
+            startListening();
+          }
+        }, 700);
+      }
+
       function renderAll() {
         if (state.mode === 'input') showInputPage();
         else showPracticePage();
@@ -613,8 +713,11 @@
         els.promptText.textContent = computeDisplayPrompt();
         updateProgressPill();
         updateScorePill();
+        updateStreakPill();
         updateMicUI();
         setButtonsForMode();
+        if (state.mode === 'practicing') scheduleAutoStart();
+        else clearAutoStartTimer();
       }
 
       function freshResultForItem(item) {
@@ -642,9 +745,11 @@
           return;
         }
         stopRecognitionIfNeeded();
+        stopSpeakingIfNeeded();
         state.items = items;
         state.currentIndex = 0;
         state.results = items.map(freshResultForItem);
+        state.streak = 0;
         state.mode = 'practicing';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
@@ -657,8 +762,10 @@
           return;
         }
         stopRecognitionIfNeeded();
+        stopSpeakingIfNeeded();
         state.currentIndex = 0;
         state.results = state.items.map(freshResultForItem);
+        state.streak = 0;
         state.mode = 'practicing';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
@@ -667,9 +774,11 @@
 
       function exitPractice() {
         stopRecognitionIfNeeded();
+        stopSpeakingIfNeeded();
         state.items = [];
         state.results = [];
         state.currentIndex = 0;
+        state.streak = 0;
         state.mode = 'input';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
@@ -685,6 +794,7 @@
 
       function stopRecognitionIfNeeded() {
         clearRecognitionFallbackTimer();
+        clearAutoStartTimer();
         if (state.recognition && state.isListening) {
           state.suppressNextError = true;
           try { state.recognition.stop(); } catch (_) {}
@@ -753,6 +863,8 @@
       function startListening() {
         if (state.mode !== 'practicing') return;
         if (!currentItem()) return;
+        unlockAudioOnce();
+        clearAutoStartTimer();
         hideIntermediateBlocks();
         if (!state.speechApiSupported || !state.recognition) {
           const text = prompt('当前浏览器不支持语音识别，请手动输入你刚才背诵的内容：', '') ?? '';
@@ -793,11 +905,17 @@
         if (decision.pass) {
           result.userDecision = 'correct';
           result.status = 'done';
+          state.streak += 1;
+          const rewardText = rewardTextForStreak(state.streak);
           els.flashBlock.classList.remove('hidden');
           els.resultBlock.classList.add('hidden');
-          els.flashText.className = 'flashText ' + (decision.reason === 'auto_pass_pinyin' ? 'warn' : 'ok');
-          els.flashText.textContent = decision.reason === 'auto_pass_pinyin' ? '读音一致，自动通过' : '正确';
-          advanceAfterHandled();
+          els.flashText.className = 'flashText ' + ((state.streak > 0 && (state.streak % 10 === 0 || state.streak === 3)) ? 'warn' : 'ok');
+          els.flashText.textContent = rewardText;
+          renderAll();
+          speakMessage(rewardText, () => {
+            if (state.mode !== 'practicing') return;
+            advanceAfterHandled();
+          });
           return;
         }
 
@@ -823,6 +941,7 @@
         const result = state.results[state.currentIndex];
         const item = currentItem();
         if (!result || !item) return;
+        state.streak = 0;
         result.userDecision = 'wrong';
         result.status = 'done';
         els.resultBlock.classList.remove('hidden');
@@ -920,6 +1039,7 @@
 
       function enterSummary() {
         stopRecognitionIfNeeded();
+        stopSpeakingIfNeeded();
         state.mode = 'summary';
         hideIntermediateBlocks();
         renderSummary();
@@ -927,7 +1047,7 @@
       }
 
       els.previewBtn.addEventListener('click', () => { saveDraft(); renderPreview(); });
-      els.startBtn.addEventListener('click', () => { saveDraft(); renderPreview(); beginPractice(); });
+      els.startBtn.addEventListener('click', () => { unlockAudioOnce(); saveDraft(); renderPreview(); beginPractice(); });
       els.clearBtn.addEventListener('click', () => {
         els.inputText.value = '';
         els.previewWrap.innerHTML = '';
