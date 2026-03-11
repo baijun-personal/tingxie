@@ -409,6 +409,7 @@
         activeRecognitionSeq: 0,
         streak: 0,
         autoStartTimer: null,
+        stopLockedUntil: 0,
         speechTimer: null,
         isSpeaking: false,
         audioUnlockDone: false
@@ -645,7 +646,8 @@
         if (state.mode === 'summary') {
           els.micHintText.textContent = '本次练习完成';
         } else if (state.isListening) {
-          els.micHintText.textContent = '正在听你背';
+          const lockRemaining = Math.max(0, state.stopLockedUntil - Date.now());
+          els.micHintText.textContent = lockRemaining > 0 ? '正在听你背，请稍等一下再停止' : '正在听你背';
         } else if (state.mode === 'confirming') {
           els.micHintText.textContent = '请判断这次是否背对';
         } else if (state.mode === 'wrong_wait_continue') {
@@ -653,7 +655,7 @@
         } else if (state.isSpeaking) {
           els.micHintText.textContent = '正在播放奖励';
         } else if (state.mode === 'practicing') {
-          els.micHintText.textContent = '进入下一项后会自动开始录音';
+          els.micHintText.textContent = state.isListening ? '正在听你背' : '点开始背诵后再按停止录音';
         } else {
           els.micHintText.textContent = '输入内容后开始';
         }
@@ -665,13 +667,16 @@
         els.restartBtn.classList.toggle('hidden', !notInput);
         els.summaryBlock.classList.toggle('hidden', state.mode !== 'summary');
         els.listenBtn.classList.add('hidden');
+        els.listenBtn.disabled = false;
         els.continueBtn.classList.add('hidden');
         els.userCorrectBtn.classList.add('hidden');
         els.userWrongBtn.classList.add('hidden');
 
         if (state.mode === 'practicing') {
           els.listenBtn.classList.remove('hidden');
+          const lockRemaining = Math.max(0, state.stopLockedUntil - Date.now());
           els.listenBtn.textContent = state.isListening ? '停止录音' : '开始背诵';
+          els.listenBtn.disabled = state.isListening && lockRemaining > 0;
         } else if (state.mode === 'confirming') {
           els.userCorrectBtn.classList.remove('hidden');
           els.userWrongBtn.classList.remove('hidden');
@@ -693,17 +698,6 @@
 
       function scheduleAutoStart() {
         clearAutoStartTimer();
-        if (state.mode !== 'practicing') return;
-        if (state.isListening || state.isSpeaking) return;
-        const item = currentItem();
-        const result = state.results[state.currentIndex];
-        if (!item || !result || result.status !== 'pending') return;
-        state.autoStartTimer = setTimeout(() => {
-          state.autoStartTimer = null;
-          if (state.mode === 'practicing' && !state.isListening && !state.isSpeaking) {
-            startListening();
-          }
-        }, 700);
       }
 
       function renderAll() {
@@ -716,8 +710,7 @@
         updateStreakPill();
         updateMicUI();
         setButtonsForMode();
-        if (state.mode === 'practicing') scheduleAutoStart();
-        else clearAutoStartTimer();
+        clearAutoStartTimer();
       }
 
       function freshResultForItem(item) {
@@ -750,6 +743,7 @@
         state.currentIndex = 0;
         state.results = items.map(freshResultForItem);
         state.streak = 0;
+        state.stopLockedUntil = 0;
         state.mode = 'practicing';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
@@ -766,6 +760,7 @@
         state.currentIndex = 0;
         state.results = state.items.map(freshResultForItem);
         state.streak = 0;
+        state.stopLockedUntil = 0;
         state.mode = 'practicing';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
@@ -779,6 +774,7 @@
         state.results = [];
         state.currentIndex = 0;
         state.streak = 0;
+        state.stopLockedUntil = 0;
         state.mode = 'input';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
@@ -837,6 +833,7 @@
           const ignore = state.suppressNextError && (code === 'aborted' || code === 'no-speech');
           state.suppressNextError = false;
           state.isListening = false;
+          state.stopLockedUntil = 0;
           clearRecognitionFallbackTimer();
           if (!ignore && state.mode === 'practicing' && !state.recognitionHandled) {
             processRecognitionResult('');
@@ -849,6 +846,7 @@
         rec.onend = () => {
           const wasListening = state.isListening;
           state.isListening = false;
+          state.stopLockedUntil = 0;
           clearRecognitionFallbackTimer();
           if (wasListening && state.mode === 'practicing' && !state.recognitionHandled) {
             processRecognitionResult('');
@@ -877,10 +875,11 @@
           state.recognitionSeq += 1;
           state.activeRecognitionSeq = state.recognitionSeq;
           clearRecognitionFallbackTimer();
+          state.stopLockedUntil = Date.now() + 1000;
           state.recognition.start();
-          state.recognitionFallbackTimer = setTimeout(() => {
-            if (state.isListening) stopRecognitionIfNeeded();
-          }, 9000);
+          setTimeout(() => {
+            if (state.mode === 'practicing') renderAll();
+          }, 1020);
         } catch (_) {
           showToast('录音暂时无法启动，请再点一次');
         }
@@ -891,6 +890,7 @@
         if (!item) return;
         const result = state.results[state.currentIndex];
         const recognized = String(text || '').trim();
+        state.stopLockedUntil = 0;
         const decision = isAutoPass(recognized, item.text);
 
         result.recognizedText = recognized;
@@ -1057,8 +1057,10 @@
       els.inputText.addEventListener('input', saveDraft);
       els.listenBtn.addEventListener('click', () => {
         if (state.mode !== 'practicing') return;
-        if (state.isListening) stopRecognitionIfNeeded();
-        else startListening();
+        if (state.isListening) {
+          if (Date.now() < state.stopLockedUntil) return;
+          stopRecognitionIfNeeded();
+        } else startListening();
       });
       els.userCorrectBtn.addEventListener('click', markCurrentAsCorrectByUser);
       els.userWrongBtn.addEventListener('click', markCurrentAsWrongByUser);
