@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习（网页单文件版）</h1>
+      <h1>中文听写练习（网页单文件版）v_fixed</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -91,8 +91,7 @@
       <textarea id="input" placeholder="检查视力 1&#10;表演结束 1,2,3&#10;布置课堂"></textarea>
 
       <div class="row" style="margin-top:10px;">
-        
-        <label class="muted">语速
+<label class="muted">语速
           <input id="rate" type="range" min="0.6" max="1.2" step="0.05" value="0.95" />
           <span id="rateVal" class="pill"></span>
         </label>
@@ -232,7 +231,7 @@
       modePill: $("modePill"),
       exitPractice: $("exitPractice"),
       input: $("input"),
-      remember: $("remember"),
+      remember: $("remember") || { checked: true, addEventListener: () => {} },
       rate: $("rate"),
       pitch: $("pitch"),
       rateVal: $("rateVal"),
