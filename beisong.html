@@ -2,164 +2,245 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <title>中文背诵练习</title>
   <style>
     :root {
-      --bg: #f6f7fb;
+      --bg: #f5f7fb;
       --card: #ffffff;
       --text: #111827;
       --muted: #6b7280;
-      --line: #d1d5db;
-      --primary: #111827;
-      --ok: #0f8a35;
-      --bad: #b42318;
+      --line: #d7dbe5;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --ok: #15803d;
+      --bad: #c2410c;
       --warn: #9a6700;
-      --soft: #f3f4f6;
+      --soft: #eef2ff;
+      --soft-2: #f8fafc;
+      --shadow: 0 8px 28px rgba(15, 23, 42, .07);
+      --radius: 18px;
+      --btn-h: 54px;
     }
     * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
     body {
-      margin: 16px;
+      margin: 0;
+      padding: 14px;
       font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
       line-height: 1.5;
       color: var(--text);
-      background: var(--bg);
+      background: linear-gradient(180deg, #f7f9fc 0%, #eef4ff 100%);
+      -webkit-tap-highlight-color: transparent;
     }
     h1, h2, h3, p { margin: 0; }
+    button, textarea, input { font: inherit; }
     .topbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
       margin-bottom: 12px;
-    }
-    .row {
-      display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
     }
-    .twoCol {
+    .titleWrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .topTitle { font-size: 22px; font-weight: 800; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .stack { display: grid; gap: 12px; }
+    .layout {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 12px;
+      gap: 14px;
+      max-width: 1120px;
+      margin: 0 auto;
     }
     @media (min-width: 980px) {
-      .twoCol { grid-template-columns: 1fr 1.15fr; }
+      .layout { grid-template-columns: 0.94fr 1.06fr; }
     }
     .card {
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.03);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
     }
-    .muted { color: var(--muted); font-size: 13px; }
+    .cardTitle { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+    .muted { color: var(--muted); font-size: 14px; }
     .pill {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 12px;
       border: 1px solid var(--line);
       border-radius: 999px;
-      padding: 4px 10px;
-      font-size: 12px;
+      font-size: 13px;
       background: #fff;
+    }
+    .bigPill {
+      font-size: 15px;
+      min-height: 40px;
+      padding: 0 14px;
+      font-weight: 700;
     }
     textarea, input[type="text"] {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 14px;
+      border-radius: 16px;
+      padding: 14px;
+      font-size: 16px;
       background: #fff;
       color: var(--text);
     }
-    textarea { min-height: 220px; resize: vertical; }
+    textarea { min-height: 240px; resize: vertical; }
     button {
+      min-height: var(--btn-h);
+      padding: 0 18px;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 16px;
       background: #fff;
       color: var(--text);
-      padding: 10px 14px;
-      font-size: 14px;
       cursor: pointer;
+      font-size: 17px;
+      font-weight: 700;
+      transition: transform .06s ease, background .15s ease, border-color .15s ease;
     }
+    button:active { transform: translateY(1px); }
     button.primary {
-      border-color: var(--primary);
       background: var(--primary);
+      border-color: var(--primary);
       color: #fff;
     }
-    button:disabled { opacity: .5; cursor: not-allowed; }
+    button.primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+    button.secondary {
+      background: #f8fafc;
+    }
+    button.warnBtn {
+      background: #fff7ed;
+      border-color: #fdba74;
+      color: #9a3412;
+    }
+    button:disabled { opacity: .55; cursor: not-allowed; }
     .hidden { display: none !important; }
-    .sectionTitle { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-    .previewList, .summaryList {
-      display: grid;
-      gap: 8px;
-      margin-top: 10px;
-    }
+    .previewList, .summaryList { display: grid; gap: 10px; margin-top: 12px; }
     .previewItem, .summaryItem {
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      background: #fafafa;
-      padding: 10px 12px;
-    }
-    .previewIndex, .summaryIndex {
-      min-width: 54px;
-      font-size: 12px;
-      color: var(--muted);
-      flex: 0 0 auto;
-      padding-top: 6px;
+      border: 1px solid #e7ebf2;
+      border-radius: 16px;
+      background: var(--soft-2);
+      padding: 12px;
     }
     .previewRow, .summaryHead {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       align-items: flex-start;
     }
-    .stageWrap {
-      min-height: 420px;
+    .previewIndex, .summaryIndex {
+      min-width: 64px;
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 13px;
+      padding-top: 8px;
+    }
+    .practiceShell {
+      min-height: min(76vh, 760px);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       gap: 16px;
     }
+    .practiceTop {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
     .promptBox {
-      border: 1px dashed #d1d5db;
-      border-radius: 16px;
-      background: #fbfbfc;
-      min-height: 180px;
+      border: 2px dashed #d4dcef;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #f8fbff 0%, #f3f7ff 100%);
+      min-height: 240px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 18px;
       text-align: center;
+      padding: 24px 18px;
     }
     .promptText {
-      font-size: 34px;
-      line-height: 1.4;
+      font-size: clamp(34px, 6vw, 48px);
+      line-height: 1.35;
+      font-weight: 800;
       word-break: break-word;
       white-space: pre-wrap;
     }
     .statusBlock {
       border: 1px solid #e5e7eb;
-      border-radius: 14px;
-      background: #fafafa;
-      padding: 14px;
+      border-radius: 18px;
+      background: #fbfcfe;
+      padding: 16px;
+    }
+    .statusTitle {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 6px;
     }
     .recognizedText, .answerText {
-      font-size: 30px;
-      line-height: 1.5;
+      font-size: clamp(26px, 5vw, 34px);
+      line-height: 1.55;
       margin-top: 6px;
       word-break: break-word;
       white-space: pre-wrap;
+      font-weight: 700;
+    }
+    .flashText {
+      font-size: clamp(32px, 6vw, 42px);
+      font-weight: 900;
+      text-align: center;
     }
     .ok { color: var(--ok); }
     .bad { color: var(--bad); }
     .warn { color: var(--warn); }
-    details summary { cursor: pointer; user-select: none; }
-    .summaryMeta {
-      display: flex;
-      flex-wrap: wrap;
+    .actionRow {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    @media (min-width: 620px) {
+      .actionRow.two { grid-template-columns: repeat(2, 1fr); }
+      .actionRow.three { grid-template-columns: repeat(3, 1fr); }
+    }
+    .micHint {
+      display: inline-flex;
+      align-items: center;
       gap: 8px;
-      margin-top: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .micDot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      display: inline-block;
+    }
+    .micDot.live {
+      background: #ef4444;
+      box-shadow: 0 0 0 8px rgba(239,68,68,.12);
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      70% { transform: scale(1.12); opacity: .75; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    details summary { cursor: pointer; user-select: none; list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    .summaryMeta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .summaryBadge {
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
     }
     .detailBox {
       margin-top: 10px;
@@ -168,31 +249,17 @@
       display: grid;
       gap: 8px;
     }
-    .detailRow { font-size: 14px; white-space: pre-wrap; word-break: break-word; }
-    .summaryBadge {
-      font-size: 13px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid #e5e7eb;
-      background: #fff;
-    }
-    .footerActions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: space-between;
-      align-items: center;
-    }
+    .detailRow { font-size: 15px; white-space: pre-wrap; word-break: break-word; }
     .toast {
       position: fixed;
       left: 50%;
       bottom: 18px;
       transform: translateX(-50%);
-      background: rgba(17, 24, 39, .92);
+      background: rgba(17, 24, 39, .93);
       color: #fff;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 13px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-size: 14px;
       pointer-events: none;
       opacity: 0;
       transition: opacity .18s ease;
@@ -200,25 +267,31 @@
       z-index: 1000;
     }
     .toast.show { opacity: 1; }
+    .stickyExit {
+      position: sticky;
+      top: 10px;
+      z-index: 10;
+    }
+    .safeBottom { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="row">
-      <h1>中文背诵练习（网页单文件版）</h1>
-      <span id="modePill" class="pill">模式：输入</span>
+  <div class="layout safeBottom">
+    <div class="topbar" style="grid-column:1/-1;">
+      <div class="titleWrap">
+        <div class="topTitle">中文背诵练习</div>
+        <span id="modePill" class="pill bigPill">模式：输入</span>
+      </div>
+      <button id="exitBtn" class="warnBtn hidden stickyExit">退出练习</button>
     </div>
-    <button id="exitBtn" class="hidden">退出练习</button>
-  </div>
 
-  <div class="twoCol">
     <div class="card" id="inputCard">
-      <div class="sectionTitle">1) 内容输入</div>
-      <div class="muted">每个非空行都会成为一个背诵项。第一项提示显示“开始”，从第二项起只显示前一项原文。</div>
+      <div class="cardTitle">内容输入</div>
+      <div class="muted">每个非空行都会成为一个背诵项。第一项显示“开始”，从第二项起只显示前一项原文。</div>
       <textarea id="inputText" placeholder="静夜思&#10;李白&#10;床前明月光&#10;疑是地上霜&#10;举头望明月&#10;低头思故乡"></textarea>
-      <div class="row" style="margin-top:10px;">
-        <button class="primary" id="previewBtn">检查格式</button>
-        <button id="startBtn">开始练习</button>
+      <div class="actionRow three" style="margin-top:12px;">
+        <button class="secondary" id="previewBtn">检查格式</button>
+        <button class="primary" id="startBtn">开始练习</button>
         <button id="clearBtn">清空</button>
       </div>
       <div id="parseInfo" class="muted" style="margin-top:10px;"></div>
@@ -226,13 +299,17 @@
     </div>
 
     <div class="card hidden" id="practiceCard">
-      <div class="sectionTitle">2) 练习区</div>
-      <div class="stageWrap">
-        <div>
-          <div class="row" style="justify-content:space-between; margin-bottom:10px;">
+      <div class="cardTitle">练习区</div>
+      <div class="practiceShell">
+        <div class="stack">
+          <div class="practiceTop">
             <div class="row">
-              <span id="progressPill" class="pill">未开始</span>
-              <span id="scorePill" class="pill">正确：-</span>
+              <span id="progressPill" class="pill bigPill">未开始</span>
+              <span id="scorePill" class="pill bigPill">正确：-</span>
+            </div>
+            <div class="micHint">
+              <span id="micDot" class="micDot"></span>
+              <span id="micHintText">准备开始</span>
             </div>
           </div>
 
@@ -240,27 +317,27 @@
             <div id="promptText" class="promptText muted">请先在左侧输入内容，再开始练习。</div>
           </div>
 
-          <div id="resultBlock" class="statusBlock hidden" style="margin-top:14px;">
-            <div id="resultTitle" class="sectionTitle" style="font-size:15px; margin-bottom:4px;">结果</div>
+          <div id="resultBlock" class="statusBlock hidden">
+            <div id="resultTitle" class="statusTitle">请确认</div>
             <div class="muted">你刚才背的是：</div>
             <div id="recognizedText" class="recognizedText"></div>
             <div class="muted" style="margin-top:10px;">正确内容是：</div>
             <div id="answerText" class="answerText"></div>
           </div>
 
-          <div id="flashBlock" class="statusBlock hidden" style="margin-top:14px;">
-            <div id="flashText" class="recognizedText"></div>
+          <div id="flashBlock" class="statusBlock hidden">
+            <div id="flashText" class="flashText"></div>
           </div>
 
-          <div id="summaryBlock" class="hidden" style="margin-top:14px;">
-            <div class="sectionTitle">本次总结</div>
+          <div id="summaryBlock" class="hidden">
+            <div class="cardTitle">本次总结</div>
             <div id="summaryStats" class="muted"></div>
             <div id="summaryList" class="summaryList"></div>
           </div>
         </div>
 
-        <div>
-          <div id="actionRow" class="row">
+        <div class="stack">
+          <div id="actionRow" class="actionRow three">
             <button class="primary" id="listenBtn">开始背诵</button>
             <button id="continueBtn" class="hidden">继续</button>
             <button id="userCorrectBtn" class="hidden">我背对了</button>
@@ -274,10 +351,10 @@
 
   <div id="toast" class="toast"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.27.0/dist/index.js"></script>
   <script>
     (() => {
       const $ = (id) => document.getElementById(id);
-
       const els = {
         modePill: $('modePill'),
         exitBtn: $('exitBtn'),
@@ -305,10 +382,13 @@
         continueBtn: $('continueBtn'),
         userCorrectBtn: $('userCorrectBtn'),
         userWrongBtn: $('userWrongBtn'),
-        restartBtn: $('restartBtn')
+        restartBtn: $('restartBtn'),
+        micDot: $('micDot'),
+        micHintText: $('micHintText'),
+        toast: $('toast')
       };
 
-      const STORAGE_KEY = 'recitation_app_single_file_v1';
+      const STORAGE_KEY = 'recitation_app_single_file_v2';
       const PAUSE_WORDS = ['啊', '嗯', '呃', '哦'];
       const PUNCT_RE = /[\s\u3000，。,．、；：？！!?,“”"'‘’（）()《》〈〉【】\[\]…—-]/g;
 
@@ -316,27 +396,66 @@
         items: [],
         currentIndex: 0,
         results: [],
-        mode: 'input', // input | practicing | confirming | wrong_wait_continue | summary
+        mode: 'input',
         recognition: null,
         isListening: false,
         speechApiSupported: false,
-        sessionId: null,
         recognitionHandled: false,
         recognitionFallbackTimer: null,
-        suppressNextError: false
+        suppressNextError: false,
+        recognitionSeq: 0,
+        activeRecognitionSeq: 0
       };
 
-      function uid() {
-        return 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function showToast(msg) {
+        els.toast.textContent = msg;
+        els.toast.classList.add('show');
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(() => els.toast.classList.remove('show'), 1800);
       }
 
       function normalizeText(text) {
         let s = String(text || '');
         s = s.replace(PUNCT_RE, '');
-        for (const word of PAUSE_WORDS) {
-          s = s.split(word).join('');
-        }
+        for (const word of PAUSE_WORDS) s = s.split(word).join('');
         return s.trim();
+      }
+
+      function normalizePinyinNoTone(text) {
+        const s = normalizeText(text);
+        if (!s) return '';
+        try {
+          const pp = window.pinyinPro;
+          if (!pp || typeof pp.pinyin !== 'function') return '';
+          return pp.pinyin(s, { toneType: 'none', type: 'array', nonZh: 'consecutive' })
+            .map(x => String(x || '').trim().toLowerCase())
+            .join(' ');
+        } catch (_) {
+          return '';
+        }
+      }
+
+      function isAutoPass(recognized, target) {
+        const normalizedRecognized = normalizeText(recognized);
+        const normalizedTarget = normalizeText(target);
+        if (normalizedRecognized === normalizedTarget) {
+          return { pass: true, reason: 'auto_pass', normalizedRecognized, normalizedTarget, recognizedPinyin: '', targetPinyin: '' };
+        }
+        const recognizedPinyin = normalizePinyinNoTone(recognized);
+        const targetPinyin = normalizePinyinNoTone(target);
+        if (recognizedPinyin && targetPinyin && recognizedPinyin === targetPinyin) {
+          return { pass: true, reason: 'auto_pass_pinyin', normalizedRecognized, normalizedTarget, recognizedPinyin, targetPinyin };
+        }
+        return { pass: false, reason: 'needs_confirm', normalizedRecognized, normalizedTarget, recognizedPinyin, targetPinyin };
       }
 
       function parseLines(raw) {
@@ -347,22 +466,22 @@
           .map((text, index) => ({ id: 'item_' + (index + 1), index, text }));
       }
 
-      function saveInputDraft() {
-        const payload = { rawText: els.inputText.value || '' };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      function saveDraft() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ rawText: els.inputText.value || '' }));
       }
 
-      function loadInputDraft() {
+      function loadDraft() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
           if (!raw) return;
           const data = JSON.parse(raw);
-          if (data && typeof data.rawText === 'string') {
-            els.inputText.value = data.rawText;
-          }
+          if (data && typeof data.rawText === 'string') els.inputText.value = data.rawText;
         } catch (_) {}
       }
 
+      function currentItem() {
+        return state.items[state.currentIndex] || null;
+      }
 
       function showInputPage() {
         els.inputCard.classList.remove('hidden');
@@ -374,20 +493,10 @@
         els.practiceCard.classList.remove('hidden');
       }
 
-      function showToast(msg) {
-        const toast = els.toast || document.getElementById('toast');
-        toast.textContent = msg;
-        toast.classList.add('show');
-        clearTimeout(showToast.timer);
-        showToast.timer = setTimeout(() => toast.classList.remove('show'), 1800);
-      }
-
       function renderPreview() {
         const items = parseLines(els.inputText.value);
         els.previewWrap.innerHTML = '';
-        els.parseInfo.textContent = items.length
-          ? `共识别到 ${items.length} 个背诵项。你可以直接改下面的内容。`
-          : '还没有可用内容。';
+        els.parseInfo.textContent = items.length ? `共识别到 ${items.length} 个背诵项。你可以直接修改下面的每一行。` : '还没有可用内容。';
         items.forEach((item, i) => {
           const row = document.createElement('div');
           row.className = 'previewItem';
@@ -397,8 +506,7 @@
               <div style="flex:1;">
                 <input type="text" value="${escapeHtml(item.text)}" data-preview-index="${i}" />
               </div>
-            </div>
-          `;
+            </div>`;
           els.previewWrap.appendChild(row);
         });
 
@@ -409,56 +517,16 @@
             if (!Number.isInteger(idx) || !current[idx]) return;
             current[idx].text = input.value.trim();
             els.inputText.value = current.map(x => x.text).filter(Boolean).join('\n');
-            saveInputDraft();
+            saveDraft();
           });
         });
       }
 
-      function escapeHtml(s) {
-        return String(s)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-      }
-
       function computeDisplayPrompt() {
         if (state.mode === 'summary') return '练习已完成';
-        if (!state.items.length) return '请先在左侧输入内容，再开始练习。';
+        if (!state.items.length) return '请先输入内容，再开始练习。';
         if (state.currentIndex === 0) return '开始';
-        const prev = state.items[state.currentIndex - 1];
-        return prev ? prev.text : '开始';
-      }
-
-      function currentItem() {
-        return state.items[state.currentIndex] || null;
-      }
-
-      function updateScorePill() {
-        let finalCorrect = 0;
-        let counted = 0;
-        for (const r of state.results) {
-          if (!r) continue;
-          const finalResult = r.parentDecision ?? r.userDecision ?? null;
-          if (!finalResult) continue;
-          counted += 1;
-          if (finalResult === 'correct') finalCorrect += 1;
-        }
-        els.scorePill.textContent = counted ? `正确：${finalCorrect}/${counted}` : '正确：-';
-      }
-
-      function updateProgressPill() {
-        if (state.mode === 'summary') {
-          els.progressPill.textContent = `已完成 ${state.items.length}/${state.items.length}`;
-          return;
-        }
-        if (!state.items.length) {
-          els.progressPill.textContent = '未开始';
-          return;
-        }
-        const current = Math.min(state.currentIndex + 1, state.items.length);
-        els.progressPill.textContent = `第 ${current} 项 / 共 ${state.items.length} 项`;
+        return state.items[state.currentIndex - 1]?.text || '开始';
       }
 
       function hideIntermediateBlocks() {
@@ -466,12 +534,51 @@
         els.flashBlock.classList.add('hidden');
       }
 
-      function setButtonsForMode() {
-        const isNotInput = state.mode !== 'input';
-        els.exitBtn.classList.toggle('hidden', !isNotInput);
-        els.restartBtn.classList.toggle('hidden', !isNotInput);
-        els.summaryBlock.classList.toggle('hidden', state.mode !== 'summary');
+      function updateScorePill() {
+        let correct = 0, counted = 0;
+        state.results.forEach(r => {
+          const final = r.parentDecision ?? r.userDecision ?? null;
+          if (!final) return;
+          counted += 1;
+          if (final === 'correct') correct += 1;
+        });
+        els.scorePill.textContent = counted ? `正确：${correct}/${counted}` : '正确：-';
+      }
 
+      function updateProgressPill() {
+        if (!state.items.length) {
+          els.progressPill.textContent = '未开始';
+          return;
+        }
+        if (state.mode === 'summary') {
+          els.progressPill.textContent = `已完成 ${state.items.length}/${state.items.length}`;
+          return;
+        }
+        els.progressPill.textContent = `第 ${Math.min(state.currentIndex + 1, state.items.length)} 项 / 共 ${state.items.length} 项`;
+      }
+
+      function updateMicUI() {
+        els.micDot.classList.toggle('live', state.isListening);
+        if (state.mode === 'summary') {
+          els.micHintText.textContent = '本次练习完成';
+        } else if (state.isListening) {
+          els.micHintText.textContent = '正在听你背';
+        } else if (state.mode === 'confirming') {
+          els.micHintText.textContent = '请判断这次是否背对';
+        } else if (state.mode === 'wrong_wait_continue') {
+          els.micHintText.textContent = '请看答案，然后继续';
+        } else if (state.mode === 'practicing') {
+          els.micHintText.textContent = '准备开始';
+        } else {
+          els.micHintText.textContent = '输入内容后开始';
+        }
+      }
+
+      function setButtonsForMode() {
+        const notInput = state.mode !== 'input';
+        els.exitBtn.classList.toggle('hidden', !notInput);
+        els.restartBtn.classList.toggle('hidden', !notInput);
+        els.summaryBlock.classList.toggle('hidden', state.mode !== 'summary');
         els.listenBtn.classList.add('hidden');
         els.continueBtn.classList.add('hidden');
         els.userCorrectBtn.classList.add('hidden');
@@ -485,13 +592,7 @@
           els.userWrongBtn.classList.remove('hidden');
         } else if (state.mode === 'wrong_wait_continue') {
           els.continueBtn.classList.remove('hidden');
-        } else if (state.mode === 'summary') {
-          // only restart + exit visible
         }
-      }
-
-      function renderPrompt() {
-        els.promptText.textContent = computeDisplayPrompt();
       }
 
       function applyModePill() {
@@ -509,10 +610,29 @@
         if (state.mode === 'input') showInputPage();
         else showPracticePage();
         applyModePill();
-        renderPrompt();
+        els.promptText.textContent = computeDisplayPrompt();
         updateProgressPill();
         updateScorePill();
+        updateMicUI();
         setButtonsForMode();
+      }
+
+      function freshResultForItem(item) {
+        return {
+          itemId: item.id,
+          index: item.index,
+          targetText: item.text,
+          normalizedTarget: normalizeText(item.text),
+          recognizedText: '',
+          normalizedRecognized: '',
+          recognizedPinyin: '',
+          targetPinyin: '',
+          autoPass: false,
+          autoDecision: null,
+          userDecision: null,
+          parentDecision: null,
+          status: 'pending'
+        };
       }
 
       function beginPractice() {
@@ -524,21 +644,8 @@
         stopRecognitionIfNeeded();
         state.items = items;
         state.currentIndex = 0;
-        state.results = items.map(item => ({
-          itemId: item.id,
-          index: item.index,
-          targetText: item.text,
-          normalizedTarget: normalizeText(item.text),
-          recognizedText: '',
-          normalizedRecognized: '',
-          autoPass: false,
-          autoDecision: null,
-          userDecision: null,
-          parentDecision: null,
-          status: 'pending'
-        }));
+        state.results = items.map(freshResultForItem);
         state.mode = 'practicing';
-        state.sessionId = uid();
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
         renderAll();
@@ -551,19 +658,7 @@
         }
         stopRecognitionIfNeeded();
         state.currentIndex = 0;
-        state.results = state.items.map(item => ({
-          itemId: item.id,
-          index: item.index,
-          targetText: item.text,
-          normalizedTarget: normalizeText(item.text),
-          recognizedText: '',
-          normalizedRecognized: '',
-          autoPass: false,
-          autoDecision: null,
-          userDecision: null,
-          parentDecision: null,
-          status: 'pending'
-        }));
+        state.results = state.items.map(freshResultForItem);
         state.mode = 'practicing';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
@@ -572,14 +667,14 @@
 
       function exitPractice() {
         stopRecognitionIfNeeded();
-        state.currentIndex = 0;
+        state.items = [];
         state.results = [];
+        state.currentIndex = 0;
         state.mode = 'input';
         hideIntermediateBlocks();
         els.summaryBlock.classList.add('hidden');
         renderAll();
       }
-
 
       function clearRecognitionFallbackTimer() {
         if (state.recognitionFallbackTimer) {
@@ -594,7 +689,6 @@
           state.suppressNextError = true;
           try { state.recognition.stop(); } catch (_) {}
         }
-        state.isListening = false;
       }
 
       function setupSpeechRecognition() {
@@ -616,30 +710,6 @@
           renderAll();
         };
 
-        rec.onend = () => {
-          const wasListening = state.isListening;
-          state.isListening = false;
-          clearRecognitionFallbackTimer();
-          if (wasListening && state.mode === 'practicing' && !state.recognitionHandled) {
-            processRecognitionResult('');
-          }
-          if (state.mode === 'practicing') renderAll();
-        };
-
-        rec.onerror = (event) => {
-          const code = event && event.error ? event.error : '识别失败';
-          const shouldIgnore = state.suppressNextError && (code === 'aborted' || code === 'no-speech');
-          state.suppressNextError = false;
-          state.isListening = false;
-          clearRecognitionFallbackTimer();
-          if (!shouldIgnore && state.mode === 'practicing' && !state.recognitionHandled) {
-            processRecognitionResult('');
-            showToast('识别状态：' + code);
-          } else {
-            renderAll();
-          }
-        };
-
         rec.onresult = (event) => {
           let text = '';
           try {
@@ -650,6 +720,31 @@
           } catch (_) {}
           state.recognitionHandled = true;
           processRecognitionResult(text);
+        };
+
+        rec.onerror = (event) => {
+          const code = event && event.error ? event.error : '识别失败';
+          const ignore = state.suppressNextError && (code === 'aborted' || code === 'no-speech');
+          state.suppressNextError = false;
+          state.isListening = false;
+          clearRecognitionFallbackTimer();
+          if (!ignore && state.mode === 'practicing' && !state.recognitionHandled) {
+            processRecognitionResult('');
+            showToast('识别状态：' + code);
+          } else {
+            renderAll();
+          }
+        };
+
+        rec.onend = () => {
+          const wasListening = state.isListening;
+          state.isListening = false;
+          clearRecognitionFallbackTimer();
+          if (wasListening && state.mode === 'practicing' && !state.recognitionHandled) {
+            processRecognitionResult('');
+          } else {
+            renderAll();
+          }
         };
 
         state.recognition = rec;
@@ -667,13 +762,13 @@
         try {
           state.recognitionHandled = false;
           state.suppressNextError = false;
+          state.recognitionSeq += 1;
+          state.activeRecognitionSeq = state.recognitionSeq;
           clearRecognitionFallbackTimer();
           state.recognition.start();
           state.recognitionFallbackTimer = setTimeout(() => {
-            if (state.isListening) {
-              stopRecognitionIfNeeded();
-            }
-          }, 8000);
+            if (state.isListening) stopRecognitionIfNeeded();
+          }, 9000);
         } catch (_) {
           showToast('录音暂时无法启动，请再点一次');
         }
@@ -682,26 +777,26 @@
       function processRecognitionResult(text) {
         const item = currentItem();
         if (!item) return;
-        const recognized = String(text || '').trim();
-        const normalizedRecognized = normalizeText(recognized);
-        const normalizedTarget = normalizeText(item.text);
-        const autoPass = normalizedRecognized === normalizedTarget;
-
         const result = state.results[state.currentIndex];
-        result.recognizedText = recognized;
-        result.normalizedRecognized = normalizedRecognized;
-        result.autoPass = autoPass;
-        result.autoDecision = autoPass ? 'auto_pass' : 'needs_confirm';
-        result.targetText = item.text;
-        result.normalizedTarget = normalizedTarget;
+        const recognized = String(text || '').trim();
+        const decision = isAutoPass(recognized, item.text);
 
-        if (autoPass) {
+        result.recognizedText = recognized;
+        result.normalizedRecognized = decision.normalizedRecognized;
+        result.targetText = item.text;
+        result.normalizedTarget = decision.normalizedTarget;
+        result.recognizedPinyin = decision.recognizedPinyin || '';
+        result.targetPinyin = decision.targetPinyin || '';
+        result.autoPass = decision.pass;
+        result.autoDecision = decision.reason;
+
+        if (decision.pass) {
           result.userDecision = 'correct';
           result.status = 'done';
           els.flashBlock.classList.remove('hidden');
-          els.flashText.className = 'recognizedText ok';
-          els.flashText.textContent = '正确';
           els.resultBlock.classList.add('hidden');
+          els.flashText.className = 'flashText ' + (decision.reason === 'auto_pass_pinyin' ? 'warn' : 'ok');
+          els.flashText.textContent = decision.reason === 'auto_pass_pinyin' ? '读音一致，自动通过' : '正确';
           advanceAfterHandled();
           return;
         }
@@ -758,31 +853,21 @@
         return final === 'correct' ? '正确' : final === 'wrong' ? '错误' : '未处理';
       }
 
-      function enterSummary() {
-        stopRecognitionIfNeeded();
-        state.mode = 'summary';
-        hideIntermediateBlocks();
-        renderSummary();
-        renderAll();
-      }
-
       function renderSummary() {
+        let correct = 0, wrong = 0;
         const total = state.results.length;
-        let correct = 0;
-        let wrong = 0;
         state.results.forEach(r => {
           const final = getFinalDecision(r);
           if (final === 'correct') correct += 1;
           else if (final === 'wrong') wrong += 1;
         });
         const rate = total ? Math.round(correct / total * 100) : 0;
-        els.summaryStats.textContent = `共 ${total} 项，正确 ${correct} 项，错误 ${wrong} 项，正确率 ${rate}% 。家长可以展开每项查看详情，也可以直接改判；如果不改，就沿用前面的结果。`;
+        els.summaryStats.textContent = `共 ${total} 项，正确 ${correct} 项，错误 ${wrong} 项，正确率 ${rate}% 。点开每一项可以看细节；家长可以改判，也可以什么都不做。`;
         els.summaryList.innerHTML = '';
-
         state.results.forEach((result, idx) => {
           const item = state.items[idx];
           const final = getFinalDecision(result);
-          const autoLabel = result.autoDecision === 'auto_pass' ? '自动通过' : '需确认';
+          const autoLabel = result.autoDecision === 'auto_pass' ? '自动通过' : result.autoDecision === 'auto_pass_pinyin' ? '读音一致自动通过' : '需确认';
           const userLabel = result.userDecision === 'correct' ? '背对了' : result.userDecision === 'wrong' ? '背错了' : '未确认';
           const parentLabel = result.parentDecision === 'correct' ? '家长改为正确' : result.parentDecision === 'wrong' ? '家长改为错误' : '家长未改';
           const icon = final === 'correct' ? '✔' : final === 'wrong' ? '✘' : '·';
@@ -794,7 +879,7 @@
                 <div class="summaryHead">
                   <div class="summaryIndex">第 ${idx + 1} 项</div>
                   <div style="flex:1;">
-                    <div>${icon} ${escapeHtml(getDecisionLabel(result))}</div>
+                    <div style="font-size:17px; font-weight:800;">${icon} ${escapeHtml(getDecisionLabel(result))}</div>
                     <div class="summaryMeta">
                       <span class="summaryBadge">${escapeHtml(autoLabel)}</span>
                       <span class="summaryBadge">${escapeHtml(userLabel)}</span>
@@ -806,17 +891,17 @@
               <div class="detailBox">
                 <div class="detailRow"><strong>正确内容：</strong>${escapeHtml(item.text)}</div>
                 <div class="detailRow"><strong>识别内容：</strong>${escapeHtml(result.recognizedText || '（空白）')}</div>
+                ${result.autoDecision === 'auto_pass_pinyin' ? `<div class="detailRow"><strong>拼音对比：</strong>${escapeHtml(result.recognizedPinyin || '')} / ${escapeHtml(result.targetPinyin || '')}</div>` : ''}
                 <div class="detailRow"><strong>自动判断：</strong>${escapeHtml(autoLabel)}</div>
                 <div class="detailRow"><strong>用户选择：</strong>${escapeHtml(userLabel)}</div>
                 <div class="detailRow"><strong>最终结果：</strong>${escapeHtml(getDecisionLabel(result))}</div>
-                <div class="row" style="margin-top:4px;">
+                <div class="actionRow three" style="margin-top:6px;">
                   <button data-parent-set="correct" data-index="${idx}">改为正确</button>
                   <button data-parent-set="wrong" data-index="${idx}">改为错误</button>
                   <button data-parent-set="clear" data-index="${idx}">不修改</button>
                 </div>
               </div>
-            </details>
-          `;
+            </details>`;
           els.summaryList.appendChild(wrapper);
         });
 
@@ -826,50 +911,42 @@
             const action = btn.dataset.parentSet;
             const result = state.results[idx];
             if (!result) return;
-            if (action === 'clear') result.parentDecision = null;
-            else result.parentDecision = action;
+            result.parentDecision = action === 'clear' ? null : action;
             renderSummary();
             updateScorePill();
           });
         });
       }
 
-      els.previewBtn.addEventListener('click', () => {
-        saveInputDraft();
-        renderPreview();
-      });
+      function enterSummary() {
+        stopRecognitionIfNeeded();
+        state.mode = 'summary';
+        hideIntermediateBlocks();
+        renderSummary();
+        renderAll();
+      }
 
-      els.startBtn.addEventListener('click', () => {
-        saveInputDraft();
-        renderPreview();
-        beginPractice();
-      });
-
+      els.previewBtn.addEventListener('click', () => { saveDraft(); renderPreview(); });
+      els.startBtn.addEventListener('click', () => { saveDraft(); renderPreview(); beginPractice(); });
       els.clearBtn.addEventListener('click', () => {
         els.inputText.value = '';
         els.previewWrap.innerHTML = '';
         els.parseInfo.textContent = '已清空。';
-        saveInputDraft();
+        saveDraft();
       });
-
-      els.inputText.addEventListener('input', saveInputDraft);
-
+      els.inputText.addEventListener('input', saveDraft);
       els.listenBtn.addEventListener('click', () => {
         if (state.mode !== 'practicing') return;
-        if (state.isListening) {
-          stopRecognitionIfNeeded();
-          return;
-        }
-        startListening();
+        if (state.isListening) stopRecognitionIfNeeded();
+        else startListening();
       });
-
       els.userCorrectBtn.addEventListener('click', markCurrentAsCorrectByUser);
       els.userWrongBtn.addEventListener('click', markCurrentAsWrongByUser);
       els.continueBtn.addEventListener('click', advanceAfterHandled);
       els.restartBtn.addEventListener('click', restartPractice);
       els.exitBtn.addEventListener('click', exitPractice);
 
-      loadInputDraft();
+      loadDraft();
       renderPreview();
       setupSpeechRecognition();
       renderAll();
