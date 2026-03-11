@@ -24,7 +24,8 @@
     .hidden { display:none !important; }
     .big { font-size:28px; }
     .prompt { font-size:22px; line-height:1.5; margin-top:8px; }
-    .target { font-size:48px; text-align:center; line-height:1; }
+     .kaitiCorrect{font-family:"STKaiti","Kaiti SC","KaiTi","FangSong",serif;}
+.target { font-size:48px; text-align:center; line-height:1; }
     .manualCompare { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:stretch; margin-top:12px; }
     .compareBox { border:1px solid #ddd; border-radius:12px; padding:10px; background:#fafafa; min-height:220px; display:flex; flex-direction:column; }
     .compareTitle { font-size:13px; color:#666; margin-bottom:8px; }
@@ -99,7 +100,7 @@
       </div>
 
       <div class="row">
-        <button class="primary" id="start">开始练习</button>
+        <button class="primary" id="start">开始练习</button><button onclick="startLastWrongPractice()">上次错题练习</button>
         <button id="previewBtn">检查格式</button>
         <button id="resetAll">清空/重置</button>
       </div>
