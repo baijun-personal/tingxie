@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习（网页单文件版）v_fixed2</h1>
+      <h1>中文听写练习（网页单文件版）v_fixed42</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -102,7 +102,7 @@
       </div>
 
       <div class="row">
-        <button type="button" class="primary" id="start">开始练习</button><button type="button" id="startLastWrongBtn">上次错题练习</button>
+        <button type="button" class="primary" id="start">开始练习</button><button type="button" id="continueBtn">继续上次的练习</button><button type="button" id="startLastWrongBtn">上次错题练习</button>
         <button type="button" id="previewBtn">检查格式</button>
         <button type="button" id="resetAll">清空/重置</button>
       </div>
@@ -132,6 +132,7 @@
         <div>
           <span id="progress" class="pill">未开始</span>
           <span id="score" class="pill">正确：-</span>
+          <span id="streak" class="pill">连胜：0</span>
         </div>
       </div>
 
@@ -237,6 +238,7 @@
       rateVal: $("rateVal"),
       pitchVal: $("pitchVal"),
       start: $("start"),
+      continueBtn: $("continueBtn"),
       startLastWrongBtn: $("startLastWrongBtn"),
       previewBtn: $("previewBtn"),
       preview: $("preview"),
@@ -250,6 +252,7 @@
 
       progress: $("progress"),
       score: $("score"),
+      streak: $("streak"),
       actionStage: $("actionStage"),
       writingStage: $("writingStage"),
       manualStage: $("manualStage"),
@@ -282,6 +285,9 @@
     let padCtx = null;
     let drawing = false;
     let lastPreparedImage = "";
+    let advanceTimer = null;
+    let ocrInFlight = false;
+    let savedPracticeSnapshot = null;
 
     let state = {
       sourceText: "",
@@ -293,7 +299,8 @@
       currentFlow: "actions",
       pendingManual: null,
       streak: 0,
-      practiceType: "normal"
+      practiceType: "normal",
+      advancePending: false
     };
 
     function loadWrongBook() {
@@ -452,7 +459,7 @@ function saveLastWrongTasks(tasks) {
     function setMode(isPractice) {
       document.body.classList.toggle("practice", !!isPractice);
       el.exitPractice.classList.toggle("hidden", !isPractice);
-      const label = !isPractice ? "模式：准备" : (state.practiceType === "wrongbook" ? "模式：错题本练习" : "模式：练习中");
+      const label = !isPractice ? "模式：准备" : (state.practiceType === "wrongbook" ? "模式：错题本练习" : (state.practiceType === "lastwrong" ? "模式：上次错题练习" : "模式：练习中"));
       el.modePill.textContent = label;
       persistIfNeeded();
     }
@@ -756,18 +763,79 @@ function saveLastWrongTasks(tasks) {
       persistIfNeeded();
     }
 
+    function updateStreak() {
+      if (el.streak) {
+        el.streak.textContent = `连胜：${Number(state.streak || 0)}`;
+      }
+    }
+
+    function setSubmitBusy(busy) {
+      ocrInFlight = !!busy;
+      if (el.submitOCR) el.submitOCR.disabled = !!busy;
+      if (el.manualRightBtn) el.manualRightBtn.disabled = !!busy;
+      if (el.manualWrongBtn) el.manualWrongBtn.disabled = !!busy;
+      if (el.nextAfterDontKnowBtn) el.nextAfterDontKnowBtn.disabled = !!busy;
+    }
+
+    function updateContinueButton() {
+      if (!el.continueBtn) return;
+      const hasSaved = !!(savedPracticeSnapshot && savedPracticeSnapshot.practice && savedPracticeSnapshot.state && Array.isArray(savedPracticeSnapshot.state.tasks) && savedPracticeSnapshot.state.tasks.length && !savedPracticeSnapshot.state.finished);
+      el.continueBtn.disabled = !hasSaved;
+    }
+
+    function resumeLoadedPractice() {
+      if (!savedPracticeSnapshot || !savedPracticeSnapshot.state) {
+        toast("没有可继续的练习");
+        return;
+      }
+      state = savedPracticeSnapshot.state;
+      state.advancePending = false;
+      setMode(true);
+      el.summary.innerHTML = "";
+      el.resultFlash.innerHTML = "";
+      setSubmitBusy(false);
+      if (state.finished) {
+        finishPractice();
+        return;
+      }
+      const task = currentTask();
+      if (!task) {
+        toast("没有可继续的练习");
+        return;
+      }
+      el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
+      updateScore();
+      updateStreak();
+      el.ocrStatus.textContent = "";
+      if (state.currentFlow === "manual" && state.pendingManual) {
+        el.reviewImage.src = state.pendingManual.image || "";
+        el.correctCharBox.textContent = task.targetChar;
+      } else {
+        el.reviewImage.src = "";
+        el.correctCharBox.textContent = "";
+      }
+      if (state.currentFlow === "dontKnow") {
+        el.dontKnowChar.textContent = task.targetChar;
+      }
+      setFlow(state.currentFlow || "actions");
+    }
+
     function updateScore() {
       const done = state.results.length;
       const correct = state.results.filter(r => r.result === "correct").length;
       const wrong = state.results.filter(r => r.result === "wrong").length;
       const unknown = state.results.filter(r => r.result === "dontKnow").length;
       el.score.textContent = `正确：${correct} / 已完成：${done} / 错：${wrong} / 不会：${unknown}`;
+      updateStreak();
     }
 
     function renderTask() {
       const task = currentTask();
       if (!task) return;
 
+      state.advancePending = false;
+      clearTimeout(advanceTimer);
+      setSubmitBusy(false);
       el.summary.innerHTML = "";
       el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
       el.resultFlash.innerHTML = "";
@@ -799,7 +867,8 @@ function saveLastWrongTasks(tasks) {
         currentFlow: "actions",
         pendingManual: null,
         streak: 0,
-        practiceType
+        practiceType,
+        advancePending: false
       };
       el.summary.innerHTML = "";
       setMode(true);
@@ -869,7 +938,9 @@ function saveLastWrongTasks(tasks) {
 
     function recordAndAdvance(result, extra = {}) {
       const task = currentTask();
-      if (!task) return;
+      if (!task || state.advancePending) return;
+      state.advancePending = true;
+      setSubmitBusy(true);
 
       if (result === "correct") {
         if (!extra.noStreak) {
@@ -907,12 +978,13 @@ function saveLastWrongTasks(tasks) {
       };
 
       const delay = Number.isFinite(extra.advanceDelayMs) ? extra.advanceDelayMs : (result === "correct" ? 650 : 220);
-      setTimeout(goNext, delay);
+      clearTimeout(advanceTimer);
+      advanceTimer = setTimeout(goNext, delay);
     }
 
     async function submitOCR() {
       const task = currentTask();
-      if (!task) return;
+      if (!task || ocrInFlight || state.advancePending) return;
 
       const prepared = preparePadImage();
       if (!prepared) {
@@ -920,6 +992,7 @@ function saveLastWrongTasks(tasks) {
         return;
       }
 
+      setSubmitBusy(true);
       el.ocrStatus.textContent = "识别中...";
       try {
         const recognized = await recognizeWithGoogleVision(prepared.base64);
@@ -932,24 +1005,22 @@ function saveLastWrongTasks(tasks) {
           const feedback = getSuccessFeedback();
           showFlash(`<div class="ok">${feedback.text}</div>`);
           flashPadSuccess();
+          updateStreak();
           state.streak -= 1;
-          const isLongPraise = feedback.text !== "对了 ✅";
-          if (isLongPraise) {
-            speakImmediate(feedback.speech, () => {
-              recordAndAdvance("correct", {
-                method: "ocr",
-                recognized,
-                image: prepared.dataUrl,
-                advanceDelayMs: 120
-              });
-            });
-          } else {
-            speakImmediate(feedback.speech);
+          const commit = () => {
             recordAndAdvance("correct", {
               method: "ocr",
               recognized,
-              image: prepared.dataUrl
+              image: prepared.dataUrl,
+              advanceDelayMs: 180
             });
+          };
+          const isLongPraise = feedback.text !== "对了 ✅";
+          if (isLongPraise) {
+            speakImmediate(feedback.speech, commit);
+          } else {
+            speakImmediate(feedback.speech);
+            commit();
           }
           return;
         }
@@ -963,6 +1034,7 @@ function saveLastWrongTasks(tasks) {
         el.reviewImage.src = prepared.dataUrl;
         el.correctCharBox.textContent = task.targetChar;
         setFlow("manual");
+        setSubmitBusy(false);
         persistIfNeeded();
       } catch (e) {
         el.ocrStatus.textContent = "识别失败，请手动检查。";
@@ -974,6 +1046,7 @@ function saveLastWrongTasks(tasks) {
         el.reviewImage.src = prepared.dataUrl;
         el.correctCharBox.textContent = task.targetChar;
         setFlow("manual");
+        setSubmitBusy(false);
         persistIfNeeded();
       }
     }
@@ -1124,6 +1197,7 @@ function saveLastWrongTasks(tasks) {
         });
       }
 
+      setSubmitBusy(false);
       persistIfNeeded();
     }
 
@@ -1140,34 +1214,37 @@ function saveLastWrongTasks(tasks) {
         currentFlow: "actions",
         pendingManual: null,
         streak: 0,
-        practiceType: "normal"
+        practiceType: "normal",
+        advancePending: false
       };
       el.input.value = "";
       el.preview.innerHTML = "";
       el.summary.innerHTML = "";
       el.progress.textContent = "未开始";
       el.score.textContent = "正确：-";
+      if (el.streak) el.streak.textContent = "连胜：0";
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_TEXT);
+      savedPracticeSnapshot = null;
+      updateContinueButton();
+      setSubmitBusy(false);
       setMode(false);
       clearPad();
     }
 
     function persistIfNeeded() {
-      if (!el.remember.checked) {
-        localStorage.removeItem(LS_KEY);
-        localStorage.removeItem(LS_TEXT);
-        return;
-      }
       localStorage.setItem(LS_TEXT, el.input.value || "");
-      localStorage.setItem(LS_KEY, JSON.stringify({
+      const snapshot = {
         state,
         practice: document.body.classList.contains("practice"),
-        remember: el.remember.checked,
+        remember: true,
         rate: el.rate.value,
         pitch: el.pitch.value,
         wrongbookCountInput: el.wrongbookCountInput.value
-      }));
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+      savedPracticeSnapshot = snapshot;
+      updateContinueButton();
     }
 
     function restoreIfNeeded() {
@@ -1177,40 +1254,28 @@ function saveLastWrongTasks(tasks) {
 
       try {
         const raw = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-        if (!raw) return;
+        if (!raw) {
+          updateContinueButton();
+          return;
+        }
         if (raw.rate) el.rate.value = raw.rate;
         if (raw.pitch) el.pitch.value = raw.pitch;
         if (raw.wrongbookCountInput) el.wrongbookCountInput.value = raw.wrongbookCountInput;
-        if (typeof raw.remember === "boolean") el.remember.checked = raw.remember;
         setPills();
 
         if (raw.state) {
+          savedPracticeSnapshot = raw;
           state = raw.state;
-          if (raw.practice && Array.isArray(state.tasks) && state.tasks.length) {
-            setMode(true);
-            if (state.finished) {
-              finishPractice();
-            } else {
-              const task = currentTask();
-              if (task) {
-                el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
-                updateScore();
-                if (state.currentFlow === "manual" && state.pendingManual) {
-                  el.reviewImage.src = state.pendingManual.image || "";
-                  el.correctCharBox.textContent = task.targetChar;
-                }
-                if (state.currentFlow === "dontKnow") {
-                  el.dontKnowChar.textContent = task.targetChar;
-                }
-                setFlow(state.currentFlow || "actions");
-              }
-            }
-          }
+          state.advancePending = false;
+          updateScore();
+          updateStreak();
         }
       } catch (e) {}
+      updateContinueButton();
     }
 
     if (el.startLastWrongBtn) el.startLastWrongBtn.addEventListener("click", startLastWrongPractice);
+    if (el.continueBtn) el.continueBtn.addEventListener("click", resumeLoadedPractice);
     el.previewBtn.addEventListener("click", renderFormatCheck);
     el.start.addEventListener("click", beginFromInput);
     el.resetAll.addEventListener("click", resetAll);
@@ -1229,12 +1294,12 @@ function saveLastWrongTasks(tasks) {
     el.nextAfterDontKnowBtn.addEventListener("click", nextAfterDontKnow);
     el.rate.addEventListener("input", () => { setPills(); persistIfNeeded(); });
     el.pitch.addEventListener("input", () => { setPills(); persistIfNeeded(); });
-    el.remember.addEventListener("change", persistIfNeeded);
 
     initPad();
     restoreIfNeeded();
     renderWrongBookSummary();
     setPills();
+    updateContinueButton();
   })();
   </script>
 </body>
