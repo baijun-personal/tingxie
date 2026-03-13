@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习（网页单文件版）v_fixed52</h1>
+      <h1>中文听写练习（网页单文件版）v_fixed62</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -908,16 +908,26 @@ function saveLastWrongTasks(tasks) {
       u.lang = "zh-CN";
       u.rate = Number(el.rate.value);
       u.pitch = Number(el.pitch.value);
+
       if (typeof onEnd === "function") {
         let called = false;
+        const minDelay = Math.max(420, Math.min(1200, String(text || "").length * 260));
         const done = () => {
           if (called) return;
           called = true;
           onEnd();
         };
-        u.onend = done;
-        u.onerror = done;
+        const timer = setTimeout(done, minDelay);
+        u.onend = () => {
+          clearTimeout(timer);
+          done();
+        };
+        u.onerror = () => {
+          clearTimeout(timer);
+          done();
+        };
       }
+
       window.speechSynthesis.speak(u);
     }
 
@@ -1019,16 +1029,10 @@ function saveLastWrongTasks(tasks) {
               method: "ocr",
               recognized,
               image: prepared.dataUrl,
-              advanceDelayMs: 180
+              advanceDelayMs: 120
             });
           };
-          const isLongPraise = feedback.text !== "对了 ✅";
-          if (isLongPraise) {
-            speakImmediate(feedback.speech, commit);
-          } else {
-            speakImmediate(feedback.speech);
-            commit();
-          }
+          speakImmediate(feedback.speech, commit);
           return;
         }
 
