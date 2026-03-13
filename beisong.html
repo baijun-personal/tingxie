@@ -447,6 +447,8 @@
       rewardTimer: null,
       speechSynthesisEnabled: 'speechSynthesis' in window,
       pauseForRewardMs: 1200,
+      recognitionStartTs: 0,
+      recognitionRetried: false,
     };
 
 
@@ -616,6 +618,8 @@
       state.recognition = rec;
       state.resultHandled = false;
       state.latestTranscript = '';
+      state.recognitionStartTs = Date.now();
+      state.recognitionRetried = false;
 
       rec.lang = 'zh-CN';
       rec.interimResults = false;
@@ -636,14 +640,26 @@
       };
 
       rec.onerror = () => {
-        processRecognitionResult(state.latestTranscript || '');
+        // Let onend decide whether to retry once or fall back to manual confirmation.
       };
 
       rec.onend = () => {
         const shouldFallback = !state.resultHandled && state.mode === 'practice';
+        const duration = Date.now() - state.recognitionStartTs;
+        const transcript = state.latestTranscript || '';
         setListeningUI(false);
+
+        if (shouldFallback && !transcript && duration < 1000 && !state.recognitionRetried) {
+          state.recognitionRetried = true;
+          state.recognitionStartTs = Date.now();
+          try {
+            rec.start();
+            return;
+          } catch (_) {}
+        }
+
         if (shouldFallback) {
-          processRecognitionResult(state.latestTranscript || '');
+          processRecognitionResult(transcript);
         }
       };
 
@@ -659,6 +675,8 @@
         try { state.recognition.abort(); } catch (_) {}
         state.recognition = null;
       }
+      state.recognitionStartTs = 0;
+      state.recognitionRetried = false;
       setListeningUI(false);
     }
 
@@ -827,8 +845,12 @@
       const result = recordResultBase(els.recognizedText.textContent === '（空白）' ? '' : els.recognizedText.textContent, 'manual', 'manual_wrong', 'wrong');
       state.results.push(result);
       showFeedback(result.recognizedText, result.targetText);
-      prepareContinueOnly();
-      els.practiceHint.textContent = '已记录为错误。看完答案后点“继续”。';
+      hideConfirmAndContinue();
+      els.practiceHint.textContent = '已记录为错误。请看一下正确答案，即将进入下一项。';
+      setTimeout(() => {
+        if (state.mode !== 'practice') return;
+        goNext();
+      }, 1300);
     }
 
     function goNext() {
