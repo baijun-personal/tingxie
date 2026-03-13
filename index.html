@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习（网页单文件版）v_fixed62</h1>
+      <h1>中文听写练习v_fixed62</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -832,7 +832,7 @@ function saveLastWrongTasks(tasks) {
       const correct = state.results.filter(r => r.result === "correct").length;
       const wrong = state.results.filter(r => r.result === "wrong").length;
       const unknown = state.results.filter(r => r.result === "dontKnow").length;
-      el.score.textContent = `正确：${correct} / 已完成：${done} / 错：${wrong} / 不会：${unknown}`;
+      el.score.textContent = `正确：${correct} / 错：${wrong} / 不会：${unknown}`;
       updateStreak();
     }
 
