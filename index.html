@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed62</h1>
+      <h1>中文听写练习v_fixed63</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -1109,18 +1109,19 @@ function saveLastWrongTasks(tasks) {
 
     function finishPractice() {
       state.finished = true;
-      const total = state.results.length;
-      const autoCorrect = state.results.filter(r => r.result === "correct" && r.method !== "manual");
-      const manualCorrect = state.results.filter(r => r.result === "correct" && r.method === "manual");
-      const wrong = state.results.filter(r => r.result === "wrong");
-      const dontKnow = state.results.filter(r => r.result === "dontKnow");
-      const correct = autoCorrect.length + manualCorrect.length;
-      const pct = total ? Math.round(correct / total * 100) : 0;
 
-      const mistakes = state.results.filter(r => r.result !== "correct");
-      const retryTasks = state.allTasks.filter(task => mistakes.some(r => r.taskId === task.id));
-
-      saveLastWrongTasks(retryTasks);
+      const recomputeSummaryData = () => {
+        const total = state.results.length;
+        const autoCorrect = state.results.filter(r => r.result === "correct" && r.method !== "manual");
+        const manualCorrect = state.results.filter(r => r.result === "correct" && r.method === "manual");
+        const wrong = state.results.filter(r => r.result === "wrong");
+        const dontKnow = state.results.filter(r => r.result === "dontKnow");
+        const correct = autoCorrect.length + manualCorrect.length;
+        const pct = total ? Math.round(correct / total * 100) : 0;
+        const mistakes = state.results.filter(r => r.result !== "correct");
+        const retryTasks = state.tasks.filter(task => mistakes.some(r => r.taskId === task.id));
+        return { total, manualCorrect, wrong, dontKnow, correct, pct, retryTasks };
+      };
 
       const buildSimpleList = (items) => {
         if (!items.length) return "";
@@ -1128,7 +1129,7 @@ function saveLastWrongTasks(tasks) {
       };
 
       const buildManualReview = (items) => {
-        if (!items.length) return `<div class="ok" style="margin-top:12px;">没有需要家长检查的手动判对项目 ✅</div>`;
+        if (!items.length) return `<div class="ok" style="margin-top:12px;">没有需要家长改判的项目 ✅</div>`;
         return `
           <div class="summaryList">
             ${items.map(r => `
@@ -1136,9 +1137,9 @@ function saveLastWrongTasks(tasks) {
                 <img class="summaryThumb" src="${r.image || ""}" alt="handwriting" />
                 <div class="summaryMeta">
                   <div class="summaryChar">${escapeHtml(r.targetChar)}</div>
+                  <div class="muted">这题目前记为“写对”。如果其实写错了，可在这里改判。</div>
                   <div style="margin-top:6px;">
-                    <button class="revOk" data-id="${r.taskId}">确认写对</button>
-                    <button class="revWrong" data-id="${r.taskId}">改成写错</button>
+                    <button class="revWrong" data-id="${r.taskId}">我写错了</button>
                   </div>
                 </div>
               </div>
@@ -1147,69 +1148,89 @@ function saveLastWrongTasks(tasks) {
         `;
       };
 
-      el.progress.textContent = `已完成：${total} / ${state.tasks.length}`;
-      updateScore();
-      el.resultFlash.innerHTML = "";
-      el.actionStage.classList.add("hidden");
-      el.writingStage.classList.add("hidden");
-      el.manualStage.classList.add("hidden");
-      el.dontKnowStage.classList.add("hidden");
+      const renderSummary = () => {
+        const { total, manualCorrect, wrong, dontKnow, correct, pct, retryTasks } = recomputeSummaryData();
+        saveLastWrongTasks(retryTasks);
 
-      el.summary.innerHTML = `
-        <div class="card" style="margin:0;">
-          <div class="big">总结</div>
-          <div class="row" style="margin-top:8px;">
-            <span class="pill">总题数：${total}</span>
-            <span class="pill ok">正确：${correct}</span>
-            <span class="pill bad">写错：${wrong.length}</span>
-            <span class="pill warn">不会：${dontKnow.length}</span>
-            <span class="pill">正确率：${pct}%</span>
+        el.progress.textContent = `已完成：${total} / ${state.tasks.length}`;
+        updateScore();
+        el.resultFlash.innerHTML = "";
+        el.actionStage.classList.add("hidden");
+        el.writingStage.classList.add("hidden");
+        el.manualStage.classList.add("hidden");
+        el.dontKnowStage.classList.add("hidden");
+
+        el.summary.innerHTML = `
+          <div class="card" style="margin:0;">
+            <div class="big">总结</div>
+            <div class="row" style="margin-top:8px;">
+              <span class="pill">总题数：${total}</span>
+              <span class="pill ok">正确：${correct}</span>
+              <span class="pill bad">写错：${wrong.length}</span>
+              <span class="pill warn">不会：${dontKnow.length}</span>
+              <span class="pill">正确率：${pct}%</span>
+            </div>
+
+            <div style="margin-top:12px;">
+              <div class="muted">写错了：</div>
+              ${wrong.length ? buildSimpleList(wrong) : `<div class="ok" style="margin-top:8px;">没有写错的字 ✅</div>`}
+            </div>
+
+            <div style="margin-top:12px;">
+              <div class="muted">我不会：</div>
+              ${dontKnow.length ? buildSimpleList(dontKnow) : `<div class="ok" style="margin-top:8px;">没有不会的字 ✅</div>`}
+            </div>
+
+            <div style="margin-top:12px;">
+              <div class="muted">家长检查（这里只保留“我写错了”改判）：</div>
+              ${buildManualReview(manualCorrect)}
+            </div>
+
+            <div class="row" style="margin-top:12px;">
+              <button class="primary" id="retryAllBtn">从头开始</button>
+              <button id="retryWrongBtn" ${retryTasks.length ? "" : "disabled"}>只练习错了的和不会的</button>
+            </div>
           </div>
+        `;
 
+        const retryAllBtn = $("retryAllBtn");
+        const retryWrongBtn = $("retryWrongBtn");
 
-          <div style="margin-top:12px;">
-            <div class="muted">写错了：</div>
-            ${wrong.length ? buildSimpleList(wrong) : `<div class="ok" style="margin-top:8px;">没有写错的字 ✅</div>`}
-          </div>
-
-          <div style="margin-top:12px;">
-            <div class="muted">我不会：</div>
-            ${dontKnow.length ? buildSimpleList(dontKnow) : `<div class="ok" style="margin-top:8px;">没有不会的字 ✅</div>`}
-          </div>
-
-          <div style="margin-top:12px;">
-            <div class="muted">家长检查（手动确认“我写对了”）：</div>
-            ${buildManualReview(manualCorrect)}
-          </div>
-
-          <div class="row" style="margin-top:12px;">
-            <button class="primary" id="retryAllBtn">从头开始</button>
-            <button id="retryWrongBtn" ${retryTasks.length ? "" : "disabled"}>只练习错了的和不会的</button>
-          </div>
-        </div>
-      `;
-
-      const retryAllBtn = $("retryAllBtn");
-      const retryWrongBtn = $("retryWrongBtn");
-
-      if (retryAllBtn) {
-        retryAllBtn.addEventListener("click", () => {
-          if (state.practiceType === "wrongbook") {
-            startWrongBookPractice();
-          } else {
-            const parsed = parseSource(state.sourceText);
-            startPractice(parsed.tasks, state.sourceText);
-          }
+        el.summary.querySelectorAll('.revWrong').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-id');
+            const item = state.results.find(r => r.taskId === targetId && r.result === 'correct' && r.method === 'manual');
+            if (!item) return;
+            item.result = 'wrong';
+            state.streak = 0;
+            persistIfNeeded();
+            renderSummary();
+          });
         });
-      }
 
-      if (retryWrongBtn) {
-        retryWrongBtn.addEventListener("click", () => {
-          saveLastWrongTasks(retryTasks);
-          startPractice(retryTasks, state.sourceText, state.practiceType || "normal");
-        });
-      }
+        if (retryAllBtn) {
+          retryAllBtn.addEventListener("click", () => {
+            if (state.practiceType === "wrongbook") {
+              startWrongBookPractice();
+            } else if (state.practiceType === "lastwrong") {
+              startLastWrongPractice();
+            } else {
+              const parsed = parseSource(state.sourceText);
+              startPractice(parsed.tasks, state.sourceText);
+            }
+          });
+        }
 
+        if (retryWrongBtn) {
+          retryWrongBtn.addEventListener("click", () => {
+            const latest = recomputeSummaryData().retryTasks;
+            saveLastWrongTasks(latest);
+            startPractice(latest, state.sourceText, "retrywrong");
+          });
+        }
+      };
+
+      renderSummary();
       setSubmitBusy(false);
       persistIfNeeded();
     }
