@@ -903,7 +903,6 @@ function saveLastWrongTasks(tasks) {
         if (typeof onEnd === "function") onEnd();
         return;
       }
-      window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "zh-CN";
       u.rate = Number(el.rate.value);
@@ -911,7 +910,7 @@ function saveLastWrongTasks(tasks) {
 
       if (typeof onEnd === "function") {
         let called = false;
-        const minDelay = Math.max(420, Math.min(1200, String(text || "").length * 260));
+        const minDelay = Math.max(700, Math.min(1800, String(text || "").length * 320));
         const done = () => {
           if (called) return;
           called = true;
@@ -1029,7 +1028,7 @@ function saveLastWrongTasks(tasks) {
               method: "ocr",
               recognized,
               image: prepared.dataUrl,
-              advanceDelayMs: 120
+              advanceDelayMs: 380
             });
           };
           speakImmediate(feedback.speech, commit);
@@ -1067,13 +1066,16 @@ function saveLastWrongTasks(tasks) {
       if (!pending) return;
       showFlash(`<div class="ok">已确认 ✅</div>`);
       flashPadSuccess();
-      speakImmediate("已确认");
-      recordAndAdvance("correct", {
-        method: "manual",
-        recognized: pending.recognized || "",
-        image: pending.image,
-        noStreak: true
-      });
+      const commit = () => {
+        recordAndAdvance("correct", {
+          method: "manual",
+          recognized: pending.recognized || "",
+          image: pending.image,
+          noStreak: true,
+          advanceDelayMs: 380
+        });
+      };
+      speakImmediate("已确认", commit);
     }
 
     function manualMarkWrong() {
