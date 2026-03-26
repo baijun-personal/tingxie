@@ -144,7 +144,8 @@
       </div>
 
       <div id="writingStage" style="margin-top:14px;">
-        <div class="muted">请写一个字，写大一点、尽量居中。</div>
+        <div class="muted" id="writingHint">请写一个字，写大一点、尽量居中。</div>
+        <div id="retryHint" class="warn hidden" style="margin-top:8px;"></div>
         <div style="margin-top:8px;">
           <canvas id="pad" width="294" height="294"></canvas>
         </div>
@@ -255,6 +256,8 @@
       streak: $("streak"),
       actionStage: $("actionStage"),
       writingStage: $("writingStage"),
+      writingHint: $("writingHint"),
+      retryHint: $("retryHint"),
       manualStage: $("manualStage"),
       dontKnowStage: $("dontKnowStage"),
       resultFlash: $("resultFlash"),
@@ -300,7 +303,8 @@
       pendingManual: null,
       streak: 0,
       practiceType: "normal",
-      advancePending: false
+      advancePending: false,
+      retryContext: null
     };
 
     function loadWrongBook() {
@@ -753,6 +757,46 @@ function saveLastWrongTasks(tasks) {
       return state.tasks[state.idx] || null;
     }
 
+    function hasRetryContext() {
+      return !!(state && state.retryContext && state.retryContext.baseResult);
+    }
+
+    function updateRetryHint() {
+      if (!el.retryHint || !el.writingHint) return;
+      if (hasRetryContext()) {
+        const label = state.retryContext.baseResult === "dontKnow" ? "这题先记为“我不会”。现在请重试，写对后再进入下一题。" : "这题先记为“写错了”。现在请重试，写对后再进入下一题。";
+        el.retryHint.textContent = label;
+        el.retryHint.classList.remove("hidden");
+        el.writingHint.textContent = "请重试：写一个字，写大一点、尽量居中。";
+      } else {
+        el.retryHint.textContent = "";
+        el.retryHint.classList.add("hidden");
+        el.writingHint.textContent = "请写一个字，写大一点、尽量居中。";
+      }
+    }
+
+    function enterRetryMode(baseResult, extra = {}) {
+      const task = currentTask();
+      if (!task) return;
+      state.retryContext = {
+        baseResult,
+        originalMethod: extra.originalMethod || "",
+        originalRecognized: extra.originalRecognized || "",
+        originalImage: extra.originalImage || ""
+      };
+      state.pendingManual = null;
+      el.reviewImage.src = "";
+      el.correctCharBox.textContent = "";
+      el.dontKnowChar.textContent = task.targetChar;
+      el.ocrStatus.textContent = baseResult === "dontKnow" ? "先看正确写法，再重试，直到写对为止。" : "请根据正确写法重试，直到写对为止。";
+      showFlash(baseResult === "dontKnow"
+        ? `<div class="warn">这题先记为“不会”。请看正确写法，然后重试到写对为止。</div>`
+        : `<div class="bad">这题先记为“写错了”。请重试到写对为止。</div>`);
+      clearPad();
+      setFlow("actions");
+      persistIfNeeded();
+    }
+
     function setFlow(flow) {
       state.currentFlow = flow;
       const showMain = flow === "actions";
@@ -760,6 +804,8 @@ function saveLastWrongTasks(tasks) {
       el.writingStage.classList.toggle("hidden", !showMain);
       el.manualStage.classList.toggle("hidden", flow !== "manual");
       el.dontKnowStage.classList.toggle("hidden", flow !== "dontKnow");
+      if (el.dontKnowBtn) el.dontKnowBtn.disabled = hasRetryContext();
+      updateRetryHint();
       persistIfNeeded();
     }
 
@@ -823,7 +869,11 @@ function saveLastWrongTasks(tasks) {
       }
       if (state.currentFlow === "dontKnow") {
         el.dontKnowChar.textContent = task.targetChar;
+        el.nextAfterDontKnowBtn.textContent = hasRetryContext() ? "开始重试" : "下一题";
+      } else {
+        el.nextAfterDontKnowBtn.textContent = hasRetryContext() ? "开始重试" : "下一题";
       }
+      updateRetryHint();
       setFlow(state.currentFlow || "actions");
     }
 
@@ -850,7 +900,10 @@ function saveLastWrongTasks(tasks) {
       el.reviewImage.src = "";
       el.correctCharBox.textContent = "";
       el.dontKnowChar.textContent = task.targetChar;
+      el.nextAfterDontKnowBtn.textContent = "开始重试";
       state.pendingManual = null;
+      state.retryContext = null;
+      updateRetryHint();
       setFlow("actions");
       clearPad();
       updateScore();
@@ -1019,17 +1072,33 @@ function saveLastWrongTasks(tasks) {
           el.ocrStatus.textContent = `OCR 识别：${allHan.join("") || "（无汉字）"}，判断为正确。`;
           state.streak = (state.streak || 0) + 1;
           const feedback = getSuccessFeedback();
+          const retryContext = state.retryContext ? { ...state.retryContext } : null;
           showFlash(`<div class="ok">${feedback.text}</div>`);
           flashPadSuccess();
           updateStreak();
           state.streak -= 1;
           const commit = () => {
-            recordAndAdvance("correct", {
-              method: "ocr",
-              recognized,
-              image: prepared.dataUrl,
-              advanceDelayMs: 380
-            });
+            if (retryContext) {
+              state.retryContext = null;
+              recordAndAdvance(retryContext.baseResult, {
+                method: retryContext.originalMethod || "retry",
+                retryResolved: true,
+                retryMethod: "ocr",
+                recognized: retryContext.originalRecognized || recognized,
+                image: retryContext.originalImage || prepared.dataUrl,
+                retryRecognized: recognized,
+                retryImage: prepared.dataUrl,
+                noStreak: true,
+                advanceDelayMs: 380
+              });
+            } else {
+              recordAndAdvance("correct", {
+                method: "ocr",
+                recognized,
+                image: prepared.dataUrl,
+                advanceDelayMs: 380
+              });
+            }
           };
           speakImmediate(feedback.speech, commit);
           return;
@@ -1064,16 +1133,33 @@ function saveLastWrongTasks(tasks) {
     function manualMarkRight() {
       const pending = state.pendingManual;
       if (!pending) return;
+      const retryContext = state.retryContext ? { ...state.retryContext } : null;
       showFlash(`<div class="ok">已确认 ✅</div>`);
       flashPadSuccess();
       const commit = () => {
-        recordAndAdvance("correct", {
-          method: "manual",
-          recognized: pending.recognized || "",
-          image: pending.image,
-          noStreak: true,
-          advanceDelayMs: 380
-        });
+        state.pendingManual = null;
+        if (retryContext) {
+          state.retryContext = null;
+          recordAndAdvance(retryContext.baseResult, {
+            method: retryContext.originalMethod || "retry",
+            retryResolved: true,
+            retryMethod: "manual",
+            recognized: retryContext.originalRecognized || pending.recognized || "",
+            image: retryContext.originalImage || pending.image,
+            retryRecognized: pending.recognized || "",
+            retryImage: pending.image,
+            noStreak: true,
+            advanceDelayMs: 380
+          });
+        } else {
+          recordAndAdvance("correct", {
+            method: "manual",
+            recognized: pending.recognized || "",
+            image: pending.image,
+            noStreak: true,
+            advanceDelayMs: 380
+          });
+        }
       };
       speakImmediate("已确认", commit);
     }
@@ -1081,11 +1167,10 @@ function saveLastWrongTasks(tasks) {
     function manualMarkWrong() {
       const pending = state.pendingManual;
       if (!pending) return;
-      showFlash(`<div class="bad">已标记：写错了 ❌</div>`);
-      recordAndAdvance("wrong", {
-        method: "manual",
-        recognized: pending.recognized || "",
-        image: pending.image
+      enterRetryMode("wrong", {
+        originalMethod: "manual",
+        originalRecognized: pending.recognized || "",
+        originalImage: pending.image || ""
       });
     }
 
@@ -1093,11 +1178,11 @@ function saveLastWrongTasks(tasks) {
 
     function markDontKnow() {
       const task = currentTask();
-      if (!task) return;
+      if (!task || hasRetryContext()) return;
       clearTimeout(dontKnowTimer);
       el.dontKnowChar.textContent = task.targetChar;
+      el.nextAfterDontKnowBtn.textContent = "开始重试";
       setFlow("dontKnow");
-      // 不自动进入下一题，由用户点击“下一题”
       persistIfNeeded();
     }
 
@@ -1105,8 +1190,9 @@ function saveLastWrongTasks(tasks) {
       clearTimeout(dontKnowTimer);
       const task = currentTask();
       if (!task) return;
-      showFlash(`<div class="warn">这题记为“不会”。正确写法：${escapeHtml(task.targetChar)}</div>`);
-      recordAndAdvance("dontKnow");
+      enterRetryMode("dontKnow", {
+        originalMethod: "dontKnow"
+      });
     }
 
     function finishPractice() {
