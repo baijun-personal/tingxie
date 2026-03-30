@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed63</h1>
+      <h1>中文听写练习v_fixed64</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -1354,17 +1354,66 @@ function saveLastWrongTasks(tasks) {
       clearPad();
     }
 
+    function makeStateSafeForStorage(srcState) {
+      const safe = JSON.parse(JSON.stringify(srcState || {}));
+      if (Array.isArray(safe.results)) {
+        safe.results = safe.results.map(r => {
+          const item = { ...r };
+          if (item.result === "correct") {
+            delete item.image;
+            delete item.retryImage;
+          } else {
+            delete item.retryImage;
+          }
+          return item;
+        });
+      }
+      if (safe.pendingManual && safe.pendingManual.task) {
+        safe.pendingManual.task = {
+          id: safe.pendingManual.task.id,
+          lineNo: safe.pendingManual.task.lineNo,
+          lineText: safe.pendingManual.task.lineText,
+          targetChar: safe.pendingManual.task.targetChar,
+          charIndex: safe.pendingManual.task.charIndex
+        };
+      }
+      if (safe.retryContext) {
+        delete safe.retryContext.originalImage;
+      }
+      return safe;
+    }
+
     function persistIfNeeded() {
-      localStorage.setItem(LS_TEXT, el.input.value || "");
-      const snapshot = {
-        state,
+      try {
+        localStorage.setItem(LS_TEXT, el.input.value || "");
+      } catch (e) {}
+
+      const buildSnapshot = (safeState) => ({
+        state: safeState,
         practice: document.body.classList.contains("practice"),
         remember: true,
         rate: el.rate.value,
         pitch: el.pitch.value,
         wrongbookCountInput: el.wrongbookCountInput.value
-      };
-      localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+      });
+
+      let snapshot = buildSnapshot(state);
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+      } catch (e) {
+        try {
+          snapshot = buildSnapshot(makeStateSafeForStorage(state));
+          localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+          state = snapshot.state;
+          toast("练习记录过大，已自动精简保存内容。");
+        } catch (e2) {
+          console.warn("persist failed", e2);
+          toast("本地保存空间不足，本次进度可能无法完整保存。请先继续完成当前题。");
+          savedPracticeSnapshot = snapshot;
+          updateContinueButton();
+          return;
+        }
+      }
       savedPracticeSnapshot = snapshot;
       updateContinueButton();
     }
