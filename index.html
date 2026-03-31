@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed65</h1>
+      <h1>中文听写练习v_fixed67</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -233,7 +233,6 @@
       modePill: $("modePill"),
       exitPractice: $("exitPractice"),
       input: $("input"),
-      remember: $("remember") || { checked: true, addEventListener: () => {} },
       rate: $("rate"),
       pitch: $("pitch"),
       rateVal: $("rateVal"),
@@ -403,8 +402,6 @@ function saveLastWrongTasks(tasks) {
       startPractice(tasks, el.input.value || state.sourceText || "", "lastwrong");
     }
 
-    window.startLastWrongPractice = startLastWrongPractice;
-
     function renderWrongBookSummary() {
       const items = loadWrongBook();
       el.wrongbookCount.textContent = `${items.length} 条`;
@@ -453,7 +450,7 @@ function saveLastWrongTasks(tasks) {
       el.toast.textContent = msg;
       el.toast.classList.add("show");
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el.toast.classList.remove("show"), 900);
+      toastTimer = setTimeout(() => el.toast.classList.remove("show"), 2800);
     }
 
     function setPills() {
@@ -478,7 +475,11 @@ function saveLastWrongTasks(tasks) {
     }
 
     function isHan(ch) {
-      return /[\u4E00-\u9FFF]/.test(ch);
+      const cp = ch.codePointAt(0);
+      return (cp >= 0x3400 && cp <= 0x4DBF)   // CJK Extension A
+          || (cp >= 0x4E00 && cp <= 0x9FFF)   // CJK Unified
+          || (cp >= 0xF900 && cp <= 0xFAFF)   // CJK Compatibility
+          || (cp >= 0x20000 && cp <= 0x3134F); // Extensions B–I
     }
 
     function hanChars(text) {
@@ -602,7 +603,12 @@ function saveLastWrongTasks(tasks) {
       const getPos = (e) => {
         const rect = el.pad.getBoundingClientRect();
         const pt = e.touches ? e.touches[0] : e;
-        return { x: pt.clientX - rect.left, y: pt.clientY - rect.top };
+        const scaleX = el.pad.width / rect.width;
+        const scaleY = el.pad.height / rect.height;
+        return {
+          x: (pt.clientX - rect.left) * scaleX,
+          y: (pt.clientY - rect.top) * scaleY
+        };
       };
 
       const start = (e) => {
@@ -1097,13 +1103,21 @@ function saveLastWrongTasks(tasks) {
 
         if (exact) {
           el.ocrStatus.textContent = `OCR 识别：${allHan.join("") || "（无汉字）"}，判断为正确。`;
-          state.streak = (state.streak || 0) + 1;
-          const feedback = getSuccessFeedback();
           const retryContext = state.retryContext ? { ...state.retryContext } : null;
-          showFlash(`<div class="ok">${feedback.text}</div>`);
+          let feedbackText, feedbackSpeech;
+          if (retryContext) {
+            feedbackText = "对了 ✅";
+            feedbackSpeech = "对了";
+          } else {
+            state.streak = (state.streak || 0) + 1;
+            const feedback = getSuccessFeedback();
+            feedbackText = feedback.text;
+            feedbackSpeech = feedback.speech;
+            state.streak -= 1;
+          }
+          showFlash(`<div class="ok">${feedbackText}</div>`);
           flashPadSuccess();
           updateStreak();
-          state.streak -= 1;
           let committed = false;
           const commit = () => {
             if (committed) return;
@@ -1132,7 +1146,7 @@ function saveLastWrongTasks(tasks) {
           };
           const commitWatchdog = setTimeout(commit, 5000);
           try {
-            speakImmediate(feedback.speech, () => {
+            speakImmediate(feedbackSpeech, () => {
               clearTimeout(commitWatchdog);
               commit();
             });
@@ -1230,13 +1244,10 @@ function saveLastWrongTasks(tasks) {
       setTransitionLock(false);
     }
 
-    let dontKnowTimer = null;
-
     function markDontKnow() {
       const task = currentTask();
       if (!task || hasRetryContext() || isUiLocked()) return;
       setTransitionLock(true);
-      clearTimeout(dontKnowTimer);
       el.dontKnowChar.textContent = task.targetChar;
       el.nextAfterDontKnowBtn.textContent = "开始重试";
       setFlow("dontKnow");
@@ -1245,7 +1256,6 @@ function saveLastWrongTasks(tasks) {
     }
 
     function nextAfterDontKnow() {
-      clearTimeout(dontKnowTimer);
       const task = currentTask();
       if (!task || isUiLocked()) return;
       setTransitionLock(true);
@@ -1385,7 +1395,6 @@ function saveLastWrongTasks(tasks) {
 
     function resetAll() {
       if (!confirm("确定要清空内容和进度吗？")) return;
-      clearTimeout(dontKnowTimer);
       state = {
         sourceText: "",
         allTasks: [],
@@ -1419,12 +1428,11 @@ function saveLastWrongTasks(tasks) {
       if (Array.isArray(safe.results)) {
         safe.results = safe.results.map(r => {
           const item = { ...r };
-          if (item.result === "correct") {
+          const keepImage = item.result === "correct" && item.method === "manual" && !item.retryResolved;
+          if (!keepImage) {
             delete item.image;
-            delete item.retryImage;
-          } else {
-            delete item.retryImage;
           }
+          delete item.retryImage;
           return item;
         });
       }
