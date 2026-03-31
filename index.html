@@ -77,7 +77,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed64</h1>
+      <h1>中文听写练习v_fixed65</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -291,6 +291,7 @@
     let advanceTimer = null;
     let ocrInFlight = false;
     let savedPracticeSnapshot = null;
+    let transitionLock = false;
 
     let state = {
       sourceText: "",
@@ -804,8 +805,8 @@ function saveLastWrongTasks(tasks) {
       el.writingStage.classList.toggle("hidden", !showMain);
       el.manualStage.classList.toggle("hidden", flow !== "manual");
       el.dontKnowStage.classList.toggle("hidden", flow !== "dontKnow");
-      if (el.dontKnowBtn) el.dontKnowBtn.disabled = hasRetryContext();
       updateRetryHint();
+      refreshActionButtons();
       persistIfNeeded();
     }
 
@@ -815,12 +816,27 @@ function saveLastWrongTasks(tasks) {
       }
     }
 
+    function refreshActionButtons() {
+      const busy = !!(ocrInFlight || transitionLock || state.advancePending);
+      if (el.submitOCR) el.submitOCR.disabled = busy;
+      if (el.manualRightBtn) el.manualRightBtn.disabled = busy;
+      if (el.manualWrongBtn) el.manualWrongBtn.disabled = busy;
+      if (el.nextAfterDontKnowBtn) el.nextAfterDontKnowBtn.disabled = busy;
+      if (el.dontKnowBtn) el.dontKnowBtn.disabled = busy || hasRetryContext();
+    }
+
+    function setTransitionLock(locked) {
+      transitionLock = !!locked;
+      refreshActionButtons();
+    }
+
     function setSubmitBusy(busy) {
       ocrInFlight = !!busy;
-      if (el.submitOCR) el.submitOCR.disabled = !!busy;
-      if (el.manualRightBtn) el.manualRightBtn.disabled = !!busy;
-      if (el.manualWrongBtn) el.manualWrongBtn.disabled = !!busy;
-      if (el.nextAfterDontKnowBtn) el.nextAfterDontKnowBtn.disabled = !!busy;
+      refreshActionButtons();
+    }
+
+    function isUiLocked() {
+      return !!(ocrInFlight || transitionLock || state.advancePending);
     }
 
     function updateContinueButton() {
@@ -846,6 +862,7 @@ function saveLastWrongTasks(tasks) {
       setMode(true);
       el.summary.innerHTML = "";
       el.resultFlash.innerHTML = "";
+      setTransitionLock(false);
       setSubmitBusy(false);
       if (state.finished) {
         finishPractice();
@@ -892,6 +909,7 @@ function saveLastWrongTasks(tasks) {
 
       state.advancePending = false;
       clearTimeout(advanceTimer);
+      setTransitionLock(false);
       setSubmitBusy(false);
       el.summary.innerHTML = "";
       el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
@@ -946,7 +964,7 @@ function saveLastWrongTasks(tasks) {
 
     function replayCurrent() {
       const task = currentTask();
-      if (!task) return;
+      if (!task || isUiLocked()) return;
       speak(getSpeakText(task));
     }
 
@@ -956,6 +974,11 @@ function saveLastWrongTasks(tasks) {
         if (typeof onEnd === "function") onEnd();
         return;
       }
+
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "zh-CN";
       u.rate = Number(el.rate.value);
@@ -963,13 +986,14 @@ function saveLastWrongTasks(tasks) {
 
       if (typeof onEnd === "function") {
         let called = false;
-        const minDelay = Math.max(700, Math.min(1800, String(text || "").length * 320));
+        const estimatedMs = Math.max(1200, Math.ceil(String(text || "").length * (750 / Math.max(0.6, Number(el.rate.value) || 1))));
+        const fallbackMs = Math.min(12000, estimatedMs + 2500);
         const done = () => {
           if (called) return;
           called = true;
           onEnd();
         };
-        const timer = setTimeout(done, minDelay);
+        const timer = setTimeout(done, fallbackMs);
         u.onend = () => {
           clearTimeout(timer);
           done();
@@ -1009,6 +1033,7 @@ function saveLastWrongTasks(tasks) {
       const task = currentTask();
       if (!task || state.advancePending) return;
       state.advancePending = true;
+      setTransitionLock(true);
       setSubmitBusy(true);
 
       if (result === "correct") {
@@ -1038,6 +1063,7 @@ function saveLastWrongTasks(tasks) {
       persistIfNeeded();
 
       const goNext = () => {
+        if (!state.advancePending) return;
         if (state.idx >= state.tasks.length - 1) {
           finishPractice();
         } else {
@@ -1049,11 +1075,12 @@ function saveLastWrongTasks(tasks) {
       const delay = Number.isFinite(extra.advanceDelayMs) ? extra.advanceDelayMs : (result === "correct" ? 650 : 220);
       clearTimeout(advanceTimer);
       advanceTimer = setTimeout(goNext, delay);
+      setTimeout(goNext, Math.max(delay + 2200, 3200));
     }
 
     async function submitOCR() {
       const task = currentTask();
-      if (!task || ocrInFlight || state.advancePending) return;
+      if (!task || isUiLocked()) return;
 
       const prepared = preparePadImage();
       if (!prepared) {
@@ -1077,7 +1104,10 @@ function saveLastWrongTasks(tasks) {
           flashPadSuccess();
           updateStreak();
           state.streak -= 1;
+          let committed = false;
           const commit = () => {
+            if (committed) return;
+            committed = true;
             if (retryContext) {
               state.retryContext = null;
               recordAndAdvance(retryContext.baseResult, {
@@ -1100,7 +1130,16 @@ function saveLastWrongTasks(tasks) {
               });
             }
           };
-          speakImmediate(feedback.speech, commit);
+          const commitWatchdog = setTimeout(commit, 5000);
+          try {
+            speakImmediate(feedback.speech, () => {
+              clearTimeout(commitWatchdog);
+              commit();
+            });
+          } catch (e) {
+            clearTimeout(commitWatchdog);
+            commit();
+          }
           return;
         }
 
@@ -1114,6 +1153,7 @@ function saveLastWrongTasks(tasks) {
         el.correctCharBox.textContent = task.targetChar;
         setFlow("manual");
         setSubmitBusy(false);
+        setTransitionLock(false);
         persistIfNeeded();
       } catch (e) {
         el.ocrStatus.textContent = "识别失败，请手动检查。";
@@ -1126,17 +1166,22 @@ function saveLastWrongTasks(tasks) {
         el.correctCharBox.textContent = task.targetChar;
         setFlow("manual");
         setSubmitBusy(false);
+        setTransitionLock(false);
         persistIfNeeded();
       }
     }
 
     function manualMarkRight() {
       const pending = state.pendingManual;
-      if (!pending) return;
+      if (!pending || isUiLocked()) return;
+      setTransitionLock(true);
       const retryContext = state.retryContext ? { ...state.retryContext } : null;
       showFlash(`<div class="ok">已确认 ✅</div>`);
       flashPadSuccess();
+      let committed = false;
       const commit = () => {
+        if (committed) return;
+        committed = true;
         state.pendingManual = null;
         if (retryContext) {
           state.retryContext = null;
@@ -1161,38 +1206,53 @@ function saveLastWrongTasks(tasks) {
           });
         }
       };
-      speakImmediate("已确认", commit);
+      const commitWatchdog = setTimeout(commit, 4000);
+      try {
+        speakImmediate("已确认", () => {
+          clearTimeout(commitWatchdog);
+          commit();
+        });
+      } catch (e) {
+        clearTimeout(commitWatchdog);
+        commit();
+      }
     }
 
     function manualMarkWrong() {
       const pending = state.pendingManual;
-      if (!pending) return;
+      if (!pending || isUiLocked()) return;
+      setTransitionLock(true);
       enterRetryMode("wrong", {
         originalMethod: "manual",
         originalRecognized: pending.recognized || "",
         originalImage: pending.image || ""
       });
+      setTransitionLock(false);
     }
 
     let dontKnowTimer = null;
 
     function markDontKnow() {
       const task = currentTask();
-      if (!task || hasRetryContext()) return;
+      if (!task || hasRetryContext() || isUiLocked()) return;
+      setTransitionLock(true);
       clearTimeout(dontKnowTimer);
       el.dontKnowChar.textContent = task.targetChar;
       el.nextAfterDontKnowBtn.textContent = "开始重试";
       setFlow("dontKnow");
+      setTransitionLock(false);
       persistIfNeeded();
     }
 
     function nextAfterDontKnow() {
       clearTimeout(dontKnowTimer);
       const task = currentTask();
-      if (!task) return;
+      if (!task || isUiLocked()) return;
+      setTransitionLock(true);
       enterRetryMode("dontKnow", {
         originalMethod: "dontKnow"
       });
+      setTransitionLock(false);
     }
 
     function finishPractice() {
