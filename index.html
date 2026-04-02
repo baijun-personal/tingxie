@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>中文听写练习</title>
   <style>
 
@@ -11,7 +11,11 @@
   src: url("simkai.ttf") format("truetype");
 }
 
-    body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 16px; line-height: 1.45; color:#111; }
+    body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 16px; line-height: 1.45; color:#111;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
     h1 { font-size: 20px; margin: 0; }
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
     .card { border: 1px solid #ddd; border-radius: 14px; padding: 14px; margin: 12px 0; background:#fff; }
@@ -40,7 +44,7 @@
     #reviewImage { max-width:100%; max-height:280px; border:1px solid #eee; border-radius:12px; background:#fff; }
     #pad { border:1px solid #ccc; border-radius:12px; background:#fff; touch-action:none; }
     #toast {
-      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+      position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
       background: rgba(0,0,0,0.82); color: #fff;
       padding: 10px 12px; border-radius: 12px; font-size: 13px;
       opacity: 0; pointer-events: none; transition: opacity 180ms ease; max-width: 90vw;
@@ -77,10 +81,11 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed67</h1>
+      <h1>中文听写练习v_fixed68</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
+    <button id="fullscreenBtn" class="hidden" title="全屏">⛶</button>
   </div>
 
   <div class="twoCol">
@@ -232,6 +237,7 @@
     const el = {
       modePill: $("modePill"),
       exitPractice: $("exitPractice"),
+      fullscreenBtn: $("fullscreenBtn"),
       input: $("input"),
       rate: $("rate"),
       pitch: $("pitch"),
@@ -458,11 +464,54 @@ function saveLastWrongTasks(tasks) {
       el.pitchVal.textContent = el.pitch.value;
     }
 
+    function isFullscreenSupported() {
+      return !!(document.documentElement.requestFullscreen ||
+                document.documentElement.webkitRequestFullscreen);
+    }
+
+    function enterFullscreen() {
+      const docEl = document.documentElement;
+      try {
+        if (docEl.requestFullscreen) docEl.requestFullscreen({ navigationUI: "hide" });
+        else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+      } catch (e) {}
+    }
+
+    function exitFullscreen() {
+      try {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } catch (e) {}
+    }
+
+    function isInFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    function updateFullscreenBtn(isPractice) {
+      if (!el.fullscreenBtn) return;
+      if (isPractice && isFullscreenSupported()) {
+        el.fullscreenBtn.classList.remove("hidden");
+        el.fullscreenBtn.textContent = isInFullscreen() ? "✕ 退出全屏" : "⛶ 全屏";
+      } else {
+        el.fullscreenBtn.classList.add("hidden");
+      }
+    }
+
+    document.addEventListener("fullscreenchange", () => updateFullscreenBtn(document.body.classList.contains("practice")));
+    document.addEventListener("webkitfullscreenchange", () => updateFullscreenBtn(document.body.classList.contains("practice")));
+
     function setMode(isPractice) {
       document.body.classList.toggle("practice", !!isPractice);
       el.exitPractice.classList.toggle("hidden", !isPractice);
       const label = !isPractice ? "模式：准备" : (state.practiceType === "wrongbook" ? "模式：错题本练习" : (state.practiceType === "lastwrong" ? "模式：上次错题练习" : "模式：练习中"));
       el.modePill.textContent = label;
+      if (isPractice) {
+        enterFullscreen();
+      } else {
+        if (isInFullscreen()) exitFullscreen();
+      }
+      updateFullscreenBtn(isPractice);
       persistIfNeeded();
     }
 
@@ -1525,6 +1574,12 @@ function saveLastWrongTasks(tasks) {
       setMode(false);
       updateContinueButton();
     });
+    if (el.fullscreenBtn) {
+      el.fullscreenBtn.addEventListener("click", () => {
+        if (isInFullscreen()) exitFullscreen();
+        else enterFullscreen();
+      });
+    }
 
     el.replayBtn.addEventListener("click", replayCurrent);
     el.dontKnowBtn.addEventListener("click", markDontKnow);
