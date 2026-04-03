@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed68</h1>
+      <h1>中文听写练习v_fixed70</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -654,10 +654,9 @@ function saveLastWrongTasks(tasks) {
         const pt = e.touches ? e.touches[0] : e;
         const scaleX = el.pad.width / rect.width;
         const scaleY = el.pad.height / rect.height;
-        return {
-          x: (pt.clientX - rect.left) * scaleX,
-          y: (pt.clientY - rect.top) * scaleY
-        };
+        const x = Math.max(0, Math.min(el.pad.width,  (pt.clientX - rect.left) * scaleX));
+        const y = Math.max(0, Math.min(el.pad.height, (pt.clientY - rect.top)  * scaleY));
+        return { x, y };
       };
 
       const start = (e) => {
@@ -675,10 +674,12 @@ function saveLastWrongTasks(tasks) {
       };
 
       const move = (e) => {
-        if (!drawing) return;
+        if (!drawing || !lastPoint) return;
         const p = getPos(e);
         const midX = (lastPoint.x + p.x) / 2;
         const midY = (lastPoint.y + p.y) / 2;
+        padCtx.beginPath();
+        padCtx.moveTo(lastPoint.x, lastPoint.y);
         padCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, midX, midY);
         padCtx.stroke();
         lastPoint = p;
@@ -686,7 +687,8 @@ function saveLastWrongTasks(tasks) {
       };
 
       const end = (e) => {
-        if (drawing && e.pointerId != null && el.pad.releasePointerCapture) {
+        if (!drawing) return;
+        if (e.pointerId != null && el.pad.releasePointerCapture) {
           try { el.pad.releasePointerCapture(e.pointerId); } catch (_) {}
         }
         drawing = false;
@@ -698,7 +700,8 @@ function saveLastWrongTasks(tasks) {
       el.pad.addEventListener("pointermove", move);
       el.pad.addEventListener("pointerup", end);
       el.pad.addEventListener("pointercancel", end);
-      el.pad.addEventListener("pointerleave", end);
+      // pointerleave removed: setPointerCapture keeps events flowing even outside canvas bounds,
+      // and ending on pointerleave was causing mid-stroke interruptions (dots/gaps)
     }
 
     function clearPad() {
