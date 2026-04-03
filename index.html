@@ -686,9 +686,12 @@ function saveLastWrongTasks(tasks) {
       };
 
       const end = (e) => {
+        if (drawing && e.pointerId != null && el.pad.releasePointerCapture) {
+          try { el.pad.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
         drawing = false;
         lastPoint = null;
-        e.preventDefault?.();
+        // no preventDefault here — allow normal scroll/touch behaviour after stroke ends
       };
 
       el.pad.addEventListener("pointerdown", start);
