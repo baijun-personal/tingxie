@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习</title>
+  <title>中文听写练习 v_fixed72</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed71</h1>
+      <h1>中文听写练习v_fixed72</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -294,6 +294,7 @@
     let drawing = false;
     let lastPreparedImage = "";
     let advanceTimer = null;
+    let watchdogTimer = null;
     let ocrInFlight = false;
     let savedPracticeSnapshot = null;
     let transitionLock = false;
@@ -651,6 +652,14 @@ function saveLastWrongTasks(tasks) {
       let lastPoint = null; // the actual last pointer position
       let lastMid = null;   // midpoint between the two most recent pointer positions
 
+      // exposed so clearPad and submitOCR can fully reset drawing state
+      const resetDrawingState = () => {
+        drawing = false;
+        lastPoint = null;
+        lastMid = null;
+      };
+      el.pad._resetDrawingState = resetDrawingState;
+
       const getPos = (e) => {
         const rect = el.pad.getBoundingClientRect();
         const pt = e.touches ? e.touches[0] : e;
@@ -677,7 +686,7 @@ function saveLastWrongTasks(tasks) {
       };
 
       const move = (e) => {
-        if (!drawing || !lastPoint) return;
+        if (!drawing || !lastPoint || !lastMid) return;
         const p = getPos(e);
         const currentMid = { x: (lastPoint.x + p.x) / 2, y: (lastPoint.y + p.y) / 2 };
         padCtx.beginPath();
@@ -709,9 +718,20 @@ function saveLastWrongTasks(tasks) {
       el.pad.addEventListener("pointermove", move);
       el.pad.addEventListener("pointerup", end);
       el.pad.addEventListener("pointercancel", end);
+
+      // Safety net: if the finger is released anywhere outside the canvas
+      // (e.g. on the submit button), the canvas pointerup never fires.
+      // This document-level handler ensures drawing always ends cleanly.
+      document.addEventListener("pointerup", (e) => {
+        if (drawing) end(e);
+      });
+      document.addEventListener("pointercancel", (e) => {
+        if (drawing) end(e);
+      });
     }
 
     function clearPad() {
+      if (el.pad._resetDrawingState) el.pad._resetDrawingState();
       padCtx.clearRect(0, 0, el.pad.width, el.pad.height);
       padCtx.fillStyle = "#fff";
       padCtx.fillRect(0, 0, el.pad.width, el.pad.height);
@@ -977,6 +997,7 @@ function saveLastWrongTasks(tasks) {
 
       state.advancePending = false;
       clearTimeout(advanceTimer);
+      clearTimeout(watchdogTimer);
       setTransitionLock(false);
       setSubmitBusy(false);
       el.summary.innerHTML = "";
@@ -1142,13 +1163,18 @@ function saveLastWrongTasks(tasks) {
 
       const delay = Number.isFinite(extra.advanceDelayMs) ? extra.advanceDelayMs : (result === "correct" ? 650 : 220);
       clearTimeout(advanceTimer);
+      clearTimeout(watchdogTimer);
       advanceTimer = setTimeout(goNext, delay);
-      setTimeout(goNext, Math.max(delay + 2200, 3200));
+      watchdogTimer = setTimeout(goNext, Math.max(delay + 2200, 3200));
     }
 
     async function submitOCR() {
       const task = currentTask();
       if (!task || isUiLocked()) return;
+
+      // Ensure drawing state is always fully reset when submitting,
+      // in case pointerup fired on the button instead of the canvas.
+      if (el.pad._resetDrawingState) el.pad._resetDrawingState();
 
       const prepared = preparePadImage();
       if (!prepared) {
