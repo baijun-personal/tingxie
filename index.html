@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed72</title>
+  <title>中文听写练习 v_fixed73</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed72</h1>
+      <h1>中文听写练习v_fixed73</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -695,7 +695,10 @@ function saveLastWrongTasks(tasks) {
         padCtx.stroke();
         lastMid = currentMid;
         lastPoint = p;
-        e.preventDefault?.();
+        // only block page scroll while the writing stage is actually visible
+        if (!el.writingStage.classList.contains("hidden")) {
+          e.preventDefault?.();
+        }
       };
 
       const end = (e) => {
@@ -1355,6 +1358,7 @@ function saveLastWrongTasks(tasks) {
 
     function finishPractice() {
       state.finished = true;
+      if (el.pad._resetDrawingState) el.pad._resetDrawingState();
 
       const recomputeSummaryData = () => {
         const total = state.results.length;
