@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed74</title>
+  <title>中文听写练习 v_fixed77</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed74</h1>
+      <h1>中文听写练习v_fixed77</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -712,12 +712,9 @@ function saveLastWrongTasks(tasks) {
         if (!drawing) return;
         // only end on the pointer that started the stroke
         if (activePointerId !== null && e.pointerId !== activePointerId) return;
-        if (lastPoint && lastMid) {
-          padCtx.beginPath();
-          padCtx.moveTo(lastMid.x, lastMid.y);
-          padCtx.lineTo(lastPoint.x, lastPoint.y);
-          padCtx.stroke();
-        }
+        // No closing segment needed — the curve in move() already ends at lastMid,
+        // which is the natural visual end of the stroke. Drawing to lastPoint
+        // would overshoot, making strokes feel longer than intended.
         if (e.pointerId != null && el.pad.releasePointerCapture) {
           try { el.pad.releasePointerCapture(e.pointerId); } catch (_) {}
         }
