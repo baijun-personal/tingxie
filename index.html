@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed77</title>
+  <title>中文听写练习 v_fixed78</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed77</h1>
+      <h1>中文听写练习v_fixed78</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -1117,6 +1117,10 @@ function saveLastWrongTasks(tasks) {
       const s = state.streak || 0;
       if (s === 3) {
         return { text: "3连胜！你太棒了！", speech: "3连胜！你太棒了！" };
+      }
+      if (s >= 50 && s % 50 === 0) {
+        const msg = `${s}连胜！你是超级江小毛！爸爸妈妈爱你哦！`;
+        return { text: msg, speech: msg };
       }
       if (s >= 10 && s % 10 === 0) {
         return { text: `${s}连胜！你是最聪明的卡皮巴拉！`, speech: `${s}连胜！你是最聪明的卡皮巴拉！` };
