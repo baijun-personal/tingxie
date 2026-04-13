@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed80</title>
+  <title>中文听写练习 v_fixed81</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed80</h1>
+      <h1>中文听写练习v_fixed81</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -561,30 +561,43 @@ function saveLastWrongTasks(tasks) {
 
     function populateVoicePicker() {
       if (!el.voicePicker || !("speechSynthesis" in window)) return;
-      const allVoices = window.speechSynthesis.getVoices();
-      const voices = allVoices.filter(isMandarin);
-      if (!voices.length) return; // voices not ready yet — will retry on voiceschanged
 
-      const saved = localStorage.getItem(LS_VOICE) || "";
-      el.voicePicker.innerHTML = "";
+      const build = () => {
+        const allVoices = window.speechSynthesis.getVoices();
+        const voices = allVoices.filter(isMandarin);
+        const saved = localStorage.getItem(LS_VOICE) || "";
 
-      // Default option — let browser choose
-      const defOpt = document.createElement("option");
-      defOpt.value = "";
-      defOpt.textContent = "默认";
-      el.voicePicker.appendChild(defOpt);
+        el.voicePicker.innerHTML = "";
+        const defOpt = document.createElement("option");
+        defOpt.value = "";
+        defOpt.textContent = "默认";
+        el.voicePicker.appendChild(defOpt);
 
-      voices.forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v.name;
-        opt.textContent = trimVoiceName(v.name);
-        if (v.name === saved) opt.selected = true;
-        el.voicePicker.appendChild(opt);
-      });
+        voices.forEach(v => {
+          const opt = document.createElement("option");
+          opt.value = v.name;
+          opt.textContent = trimVoiceName(v.name);
+          if (v.name === saved) opt.selected = true;
+          el.voicePicker.appendChild(opt);
+        });
 
-      // If saved voice not found, select default
-      if (saved && !voices.find(v => v.name === saved)) {
-        el.voicePicker.value = "";
+        if (saved && !voices.find(v => v.name === saved)) {
+          el.voicePicker.value = "";
+        }
+
+        return voices.length > 0;
+      };
+
+      // Always build immediately so "默认" is visible straight away
+      build();
+
+      // If voices were empty, keep retrying — Android Chrome loads them async
+      if (!build()) {
+        let attempts = 0;
+        const poll = setInterval(() => {
+          attempts++;
+          if (build() || attempts >= 20) clearInterval(poll);
+        }, 250);
       }
     }
 
