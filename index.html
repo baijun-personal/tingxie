@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed81</title>
+  <title>中文听写练习 v_fixed82</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed81</h1>
+      <h1>中文听写练习v_fixed82</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -554,9 +554,13 @@ function saveLastWrongTasks(tasks) {
     }
 
     function isMandarin(voice) {
-      // Accept zh-CN and zh (generic) but exclude zh-TW, zh-HK, zh-MO
-      const lang = (voice.lang || "").toLowerCase();
-      return lang === "zh-cn" || lang === "zh" || lang.startsWith("zh-cn");
+      const lang = (voice.lang || "").toLowerCase().replace(/_/g, "-");
+      const name = (voice.name || "").toLowerCase();
+      // Exclude Traditional Chinese regions
+      if (lang === "zh-tw" || lang === "zh-hk" || lang === "zh-mo") return false;
+      if (name.includes("cantonese") || name.includes("taiwanese") || name.includes("hong kong")) return false;
+      // Accept any zh variant (zh, zh-cn, zh-sg, etc.) and voices whose name mentions Simplified/PRC
+      return lang.startsWith("zh") || name.includes("simplified") || name.includes("prc") || name.includes("mandarin");
     }
 
     function populateVoicePicker() {
