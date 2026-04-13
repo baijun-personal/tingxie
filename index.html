@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed78</title>
+  <title>中文听写练习 v_fixed80</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed78</h1>
+      <h1>中文听写练习v_fixed80</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -103,6 +103,9 @@
         <label class="muted">音高
           <input id="pitch" type="range" min="0.8" max="1.2" step="0.05" value="1.0" />
           <span id="pitchVal" class="pill"></span>
+        </label>
+        <label class="muted">声音
+          <select id="voicePicker" style="padding:4px 6px; border:1px solid #ccc; border-radius:8px; font-size:13px; max-width:140px;"></select>
         </label>
       </div>
 
@@ -243,6 +246,7 @@
       pitch: $("pitch"),
       rateVal: $("rateVal"),
       pitchVal: $("pitchVal"),
+      voicePicker: $("voicePicker"),
       start: $("start"),
       continueBtn: $("continueBtn"),
       startLastWrongBtn: $("startLastWrongBtn"),
@@ -536,6 +540,66 @@ function saveLastWrongTasks(tasks) {
       return Array.from(String(text || "")).filter(isHan);
     }
 
+    const LS_VOICE = "tingxie_voice_v1";
+
+    function trimVoiceName(name) {
+      return name
+        .replace(/^Microsoft\s+/i, "")
+        .replace(/^Google\s+/i, "")
+        .replace(/\s*Online\s*\(Natural\)\s*/i, "")
+        .replace(/\s*-\s*Chinese.*$/i, "")
+        .replace(/\s*-\s*zh[-_].*/i, "")
+        .replace(/\s*Neural$/i, "")
+        .trim();
+    }
+
+    function isMandarin(voice) {
+      // Accept zh-CN and zh (generic) but exclude zh-TW, zh-HK, zh-MO
+      const lang = (voice.lang || "").toLowerCase();
+      return lang === "zh-cn" || lang === "zh" || lang.startsWith("zh-cn");
+    }
+
+    function populateVoicePicker() {
+      if (!el.voicePicker || !("speechSynthesis" in window)) return;
+      const allVoices = window.speechSynthesis.getVoices();
+      const voices = allVoices.filter(isMandarin);
+      if (!voices.length) return; // voices not ready yet — will retry on voiceschanged
+
+      const saved = localStorage.getItem(LS_VOICE) || "";
+      el.voicePicker.innerHTML = "";
+
+      // Default option — let browser choose
+      const defOpt = document.createElement("option");
+      defOpt.value = "";
+      defOpt.textContent = "默认";
+      el.voicePicker.appendChild(defOpt);
+
+      voices.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.name;
+        opt.textContent = trimVoiceName(v.name);
+        if (v.name === saved) opt.selected = true;
+        el.voicePicker.appendChild(opt);
+      });
+
+      // If saved voice not found, select default
+      if (saved && !voices.find(v => v.name === saved)) {
+        el.voicePicker.value = "";
+      }
+    }
+
+    function getSelectedVoice() {
+      if (!el.voicePicker || !("speechSynthesis" in window)) return null;
+      const name = el.voicePicker.value;
+      if (!name) return null;
+      return window.speechSynthesis.getVoices().find(v => v.name === name) || null;
+    }
+
+    function applyVoice(utterance) {
+      const voice = getSelectedVoice();
+      if (voice) utterance.voice = voice;
+    }
+
     function speak(text) {
       if (!("speechSynthesis" in window)) {
         alert("这个浏览器不支持朗读。建议用 Chrome / Edge / Safari。");
@@ -546,6 +610,7 @@ function saveLastWrongTasks(tasks) {
       u.lang = "zh-CN";
       u.rate = Number(el.rate.value);
       u.pitch = Number(el.pitch.value);
+      applyVoice(u);
       window.speechSynthesis.speak(u);
     }
 
@@ -1082,6 +1147,7 @@ function saveLastWrongTasks(tasks) {
       u.lang = "zh-CN";
       u.rate = Number(el.rate.value);
       u.pitch = Number(el.pitch.value);
+      applyVoice(u);
 
       if (typeof onEnd === "function") {
         let called = false;
@@ -1645,9 +1711,18 @@ function saveLastWrongTasks(tasks) {
     el.nextAfterDontKnowBtn.addEventListener("click", nextAfterDontKnow);
     el.rate.addEventListener("input", () => { setPills(); persistIfNeeded(); });
     el.pitch.addEventListener("input", () => { setPills(); persistIfNeeded(); });
+    if (el.voicePicker) {
+      el.voicePicker.addEventListener("change", () => {
+        localStorage.setItem(LS_VOICE, el.voicePicker.value);
+      });
+    }
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.addEventListener("voiceschanged", populateVoicePicker);
+    }
 
     initPad();
     restoreIfNeeded();
+    populateVoicePicker();
     renderWrongBookSummary();
     setPills();
     updateContinueButton();
