@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed84</title>
+  <title>中文听写练习 v_fixed85</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed84</h1>
+      <h1>中文听写练习v_fixed85</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -109,6 +109,7 @@
       <div class="row">
         <button type="button" class="primary" id="start">开始练习</button><button type="button" id="continueBtn">继续上次的练习</button><button type="button" id="startLastWrongBtn">上次错题练习</button>
         <button type="button" id="previewBtn">检查格式</button>
+        <button type="button" id="lastSummaryBtn">上次总结</button>
         <button type="button" id="resetAll">清空/重置</button>
       </div>
 
@@ -247,6 +248,7 @@
       continueBtn: $("continueBtn"),
       startLastWrongBtn: $("startLastWrongBtn"),
       previewBtn: $("previewBtn"),
+      lastSummaryBtn: $("lastSummaryBtn"),
       preview: $("preview"),
       resetAll: $("resetAll"),
       wrongbookCount: $("wrongbookCount"),
@@ -288,6 +290,7 @@
     const LS_TEXT = "tingxie_v4_text";
     const WRONGBOOK_KEY = "tingxie_wrongbook_v1";
     const LAST_WRONG_KEY = "tingxie_last_wrong_v1";
+    const LS_LAST_SUMMARY = "tingxie_last_summary_v1";
 
     let toastTimer = null;
     let padCtx = null;
@@ -501,6 +504,33 @@ function saveLastWrongTasks(tasks) {
 
     document.addEventListener("fullscreenchange", () => updateFullscreenBtn(document.body.classList.contains("practice")));
     document.addEventListener("webkitfullscreenchange", () => updateFullscreenBtn(document.body.classList.contains("practice")));
+
+    function updateLastSummaryButton() {
+      if (!el.lastSummaryBtn) return;
+      try {
+        const raw = localStorage.getItem(LS_LAST_SUMMARY);
+        el.lastSummaryBtn.disabled = !raw;
+      } catch (e) {
+        el.lastSummaryBtn.disabled = true;
+      }
+    }
+
+    function showLastSummary() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(LS_LAST_SUMMARY) || "null");
+        if (!raw) { toast("还没有完成过练习"); return; }
+        state = raw;
+        state.advancePending = false;
+        setMode(true);
+        el.summary.innerHTML = "";
+        el.resultFlash.innerHTML = "";
+        setTransitionLock(false);
+        setSubmitBusy(false);
+        finishPractice();
+      } catch (e) {
+        toast("读取上次总结失败");
+      }
+    }
 
     function setMode(isPractice) {
       document.body.classList.toggle("practice", !!isPractice);
@@ -1371,6 +1401,13 @@ function saveLastWrongTasks(tasks) {
       state.finished = true;
       if (el.pad._resetDrawingState) el.pad._resetDrawingState();
 
+      // Save a stripped snapshot for "上次总结"
+      try {
+        const summarySnap = makeStateSafeForStorage(state);
+        localStorage.setItem(LS_LAST_SUMMARY, JSON.stringify(summarySnap));
+        updateLastSummaryButton();
+      } catch (e) {}
+
       const recomputeSummaryData = () => {
         const total = state.results.length;
         const autoCorrect = state.results.filter(r => r.result === "correct" && r.method !== "manual");
@@ -1618,6 +1655,7 @@ function saveLastWrongTasks(tasks) {
 
     if (el.startLastWrongBtn) el.startLastWrongBtn.addEventListener("click", startLastWrongPractice);
     if (el.continueBtn) el.continueBtn.addEventListener("click", resumeLoadedPractice);
+    if (el.lastSummaryBtn) el.lastSummaryBtn.addEventListener("click", showLastSummary);
     el.previewBtn.addEventListener("click", renderFormatCheck);
     el.start.addEventListener("click", beginFromInput);
     el.resetAll.addEventListener("click", resetAll);
@@ -1651,6 +1689,7 @@ function saveLastWrongTasks(tasks) {
     renderWrongBookSummary();
     setPills();
     updateContinueButton();
+    updateLastSummaryButton();
   })();
   </script>
 </body>
