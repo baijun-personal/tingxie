@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>中文听写练习 v_fixed87</title>
+  <title>中文听写练习 v_fixed88</title>
   <style>
 
 @font-face {
@@ -81,7 +81,7 @@
 <body>
   <div class="topbar">
     <div class="row">
-      <h1>中文听写练习v_fixed87</h1>
+      <h1>中文听写练习v_fixed88</h1>
       <span id="modePill" class="pill">模式：准备</span>
     </div>
     <button id="exitPractice" class="hidden">退出练习</button>
@@ -314,7 +314,8 @@
       streak: 0,
       practiceType: "normal",
       advancePending: false,
-      retryContext: null
+      retryContext: null,
+      retryLog: []
     };
 
     function loadWrongBook() {
@@ -908,44 +909,168 @@ function saveLastWrongTasks(tasks) {
       return state.tasks[state.idx] || null;
     }
 
+    function isRetryTask(task = currentTask()) {
+      return !!(task && task.isRetry);
+    }
+
+    function getRetryNo(task = currentTask()) {
+      return Math.max(0, Number(task && task.retryNo ? task.retryNo : 0));
+    }
+
+    function originalTaskIdOf(task) {
+      return task ? (task.retryOfTaskId || task.id) : "";
+    }
+
+    function progressTextForTask(task) {
+      if (!task) return "未开始";
+      const retryText = isRetryTask(task) ? `（第${getRetryNo(task)}次重试，不计入统计）` : "";
+      return `进度：${state.idx + 1} / ${state.tasks.length}${retryText}`;
+    }
+
+    function nextAfterDontKnowText(task) {
+      if (isRetryTask(task)) {
+        return `加入队尾，稍后第${getRetryNo(task) + 1}次重试`;
+      }
+      return "下一题（稍后重试）";
+    }
+
+    // Compatibility name used by older parts of the code. In v_fixed88 it means
+    // “the current task is a queued retry”, not “retry immediately now”.
     function hasRetryContext() {
-      return !!(state && state.retryContext && state.retryContext.baseResult);
+      return isRetryTask(currentTask());
+    }
+
+    function retrySummaryText(r) {
+      if (!r || r.result === "correct") return "";
+      const attempts = Number(r.retryAttempts || 0);
+      if (r.retryResolved && attempts > 0) {
+        return `｜重试 ${attempts} 次后写对`;
+      }
+      if (r.retryQueued) {
+        const nextNo = Number(r.nextRetryNo || attempts + 1 || 1);
+        return `｜已安排第 ${nextNo} 次重试`;
+      }
+      return "";
+    }
+
+    function findOfficialResult(task) {
+      const originalId = originalTaskIdOf(task);
+      if (!originalId || !Array.isArray(state.results)) return null;
+      return state.results.find(r => r.taskId === originalId) || null;
+    }
+
+    function updateOfficialRetryStatus(task, patch) {
+      const item = findOfficialResult(task);
+      if (!item) return;
+      Object.assign(item, patch || {});
+    }
+
+    function appendRetryTask(task, retryNo) {
+      const originalId = originalTaskIdOf(task);
+      const retryTask = {
+        id: `${originalId}-retry-${retryNo}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        lineNo: task.lineNo,
+        lineText: task.lineText,
+        targetChar: task.targetChar,
+        charIndex: task.charIndex,
+        fromWrongBook: !!task.fromWrongBook,
+        isRetry: true,
+        retryOfTaskId: originalId,
+        retryNo
+      };
+      state.tasks.push(retryTask);
+      return retryTask;
+    }
+
+    function advanceWithoutRecording(extra = {}) {
+      if (state.advancePending) return;
+      state.advancePending = true;
+      setTransitionLock(true);
+      setSubmitBusy(true);
+      persistIfNeeded();
+
+      const goNext = () => {
+        if (!state.advancePending) return;
+        if (state.idx >= state.tasks.length - 1) {
+          finishPractice();
+        } else {
+          state.idx += 1;
+          renderTask();
+        }
+      };
+
+      const delay = Number.isFinite(extra.advanceDelayMs) ? extra.advanceDelayMs : 650;
+      clearTimeout(advanceTimer);
+      clearTimeout(watchdogTimer);
+      advanceTimer = setTimeout(goNext, delay);
+      watchdogTimer = setTimeout(goNext, Math.max(delay + 2200, 3200));
+    }
+
+    function commitRetrySuccess(extra = {}) {
+      const task = currentTask();
+      if (!task || !isRetryTask(task)) return;
+      const retryNo = getRetryNo(task);
+      const official = findOfficialResult(task);
+      const previousAttempts = official ? Number(official.retryAttempts || 0) : 0;
+      updateOfficialRetryStatus(task, {
+        retryQueued: false,
+        retryResolved: true,
+        retryAttempts: Math.max(previousAttempts, retryNo),
+        nextRetryNo: null,
+        retryMethod: extra.method || "",
+        retryRecognized: extra.recognized || ""
+      });
+      advanceWithoutRecording(extra);
+    }
+
+    function commitIncorrectAndQueue(result, extra = {}) {
+      const task = currentTask();
+      if (!task || state.advancePending) return;
+      const currentRetryNo = getRetryNo(task);
+      const nextRetryNo = currentRetryNo + 1;
+      appendRetryTask(task, nextRetryNo);
+
+      if (isRetryTask(task)) {
+        const official = findOfficialResult(task);
+        const previousAttempts = official ? Number(official.retryAttempts || 0) : 0;
+        updateOfficialRetryStatus(task, {
+          retryQueued: true,
+          retryResolved: false,
+          retryAttempts: Math.max(previousAttempts, currentRetryNo),
+          nextRetryNo,
+          retryLastResult: result,
+          retryLastMethod: extra.method || "",
+          retryLastRecognized: extra.recognized || ""
+        });
+        showFlash(`<div class="warn">第${currentRetryNo}次重试还没写对，已放到队尾，稍后第${nextRetryNo}次重试。</div>`);
+        advanceWithoutRecording(extra);
+        return;
+      }
+
+      const label = result === "dontKnow" ? "不会" : "写错";
+      showFlash(`<div class="warn">这题先记为“${label}”，已放到队尾，稍后第1次重试。</div>`);
+      recordAndAdvance(result, {
+        ...extra,
+        retryQueued: true,
+        retryResolved: false,
+        retryAttempts: 0,
+        nextRetryNo: 1
+      });
     }
 
     function updateRetryHint() {
       if (!el.retryHint || !el.writingHint) return;
-      if (hasRetryContext()) {
-        const label = state.retryContext.baseResult === "dontKnow" ? "这题先记为“我不会”。现在请重试，写对后再进入下一题。" : "这题先记为“写错了”。现在请重试，写对后再进入下一题。";
-        el.retryHint.textContent = label;
+      const task = currentTask();
+      if (isRetryTask(task)) {
+        const retryNo = getRetryNo(task);
+        el.retryHint.textContent = `第${retryNo}次重试：写对后会继续下一题，但这次不计入最后正确/错误统计。`;
         el.retryHint.classList.remove("hidden");
-        el.writingHint.textContent = "请重试：写一个字，写大一点、尽量居中。";
+        el.writingHint.textContent = `第${retryNo}次重试：请再写一次，写大一点、尽量居中。`;
       } else {
         el.retryHint.textContent = "";
         el.retryHint.classList.add("hidden");
         el.writingHint.textContent = "请写一个字，写大一点、尽量居中。";
       }
-    }
-
-    function enterRetryMode(baseResult, extra = {}) {
-      const task = currentTask();
-      if (!task) return;
-      state.retryContext = {
-        baseResult,
-        originalMethod: extra.originalMethod || "",
-        originalRecognized: extra.originalRecognized || "",
-        originalImage: extra.originalImage || ""
-      };
-      state.pendingManual = null;
-      el.reviewImage.src = "";
-      el.correctCharBox.textContent = "";
-      el.dontKnowChar.textContent = task.targetChar;
-      el.ocrStatus.textContent = baseResult === "dontKnow" ? "先看正确写法，再重试，直到写对为止。" : "请根据正确写法重试，直到写对为止。";
-      showFlash(baseResult === "dontKnow"
-        ? `<div class="warn">这题先记为“不会”。请看正确写法，然后重试到写对为止。</div>`
-        : `<div class="bad">这题先记为“写错了”。请重试到写对为止。</div>`);
-      clearPad();
-      setFlow("actions");
-      persistIfNeeded();
     }
 
     function setFlow(flow) {
@@ -972,7 +1097,7 @@ function saveLastWrongTasks(tasks) {
       if (el.manualRightBtn) el.manualRightBtn.disabled = busy;
       if (el.manualWrongBtn) el.manualWrongBtn.disabled = busy;
       if (el.nextAfterDontKnowBtn) el.nextAfterDontKnowBtn.disabled = busy;
-      if (el.dontKnowBtn) el.dontKnowBtn.disabled = busy || hasRetryContext();
+      if (el.dontKnowBtn) el.dontKnowBtn.disabled = busy;
     }
 
     function setTransitionLock(locked) {
@@ -1023,7 +1148,7 @@ function saveLastWrongTasks(tasks) {
         toast("没有可继续的练习");
         return;
       }
-      el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
+      el.progress.textContent = progressTextForTask(task);
       updateScore();
       updateStreak();
       el.ocrStatus.textContent = "";
@@ -1036,9 +1161,9 @@ function saveLastWrongTasks(tasks) {
       }
       if (state.currentFlow === "dontKnow") {
         el.dontKnowChar.textContent = task.targetChar;
-        el.nextAfterDontKnowBtn.textContent = hasRetryContext() ? "开始重试" : "下一题";
+        el.nextAfterDontKnowBtn.textContent = nextAfterDontKnowText(task);
       } else {
-        el.nextAfterDontKnowBtn.textContent = hasRetryContext() ? "开始重试" : "下一题";
+        el.nextAfterDontKnowBtn.textContent = nextAfterDontKnowText(task);
       }
       updateRetryHint();
       setFlow(state.currentFlow || "actions");
@@ -1063,13 +1188,13 @@ function saveLastWrongTasks(tasks) {
       setTransitionLock(false);
       setSubmitBusy(false);
       el.summary.innerHTML = "";
-      el.progress.textContent = `进度：${state.idx + 1} / ${state.tasks.length}`;
+      el.progress.textContent = progressTextForTask(task);
       el.resultFlash.innerHTML = "";
       el.ocrStatus.textContent = "";
       el.reviewImage.src = "";
       el.correctCharBox.textContent = "";
       el.dontKnowChar.textContent = task.targetChar;
-      el.nextAfterDontKnowBtn.textContent = "开始重试";
+      el.nextAfterDontKnowBtn.textContent = nextAfterDontKnowText(task);
       state.pendingManual = null;
       state.retryContext = null;
       updateRetryHint();
@@ -1081,7 +1206,7 @@ function saveLastWrongTasks(tasks) {
     }
 
     function startPractice(withTasks, sourceText, practiceType = "normal") {
-      const tasks = (withTasks || []).map(t => ({ ...t }));
+      const tasks = (withTasks || []).map(t => ({ ...t, isRetry: false, retryNo: 0, retryOfTaskId: "" }));
       if (!tasks.length) {
         toast("没有可练习的内容");
         return;
@@ -1097,7 +1222,8 @@ function saveLastWrongTasks(tasks) {
         pendingManual: null,
         streak: 0,
         practiceType,
-        advancePending: false
+        advancePending: false,
+        retryLog: []
       };
       el.summary.innerHTML = "";
       setMode(true);
@@ -1257,10 +1383,10 @@ function saveLastWrongTasks(tasks) {
 
         if (exact) {
           el.ocrStatus.textContent = `OCR 识别：${allHan.join("") || "（无汉字）"}，判断为正确。`;
-          const retryContext = state.retryContext ? { ...state.retryContext } : null;
+          const retryTask = isRetryTask(task);
           let feedbackText, feedbackSpeech;
-          if (retryContext) {
-            feedbackText = "对了 ✅";
+          if (retryTask) {
+            feedbackText = `第${getRetryNo(task)}次重试写对了 ✅`;
             feedbackSpeech = "对了";
           } else {
             state.streak = (state.streak || 0) + 1;
@@ -1276,17 +1402,11 @@ function saveLastWrongTasks(tasks) {
           const commit = () => {
             if (committed) return;
             committed = true;
-            if (retryContext) {
-              state.retryContext = null;
-              recordAndAdvance(retryContext.baseResult, {
-                method: retryContext.originalMethod || "retry",
-                retryResolved: true,
-                retryMethod: "ocr",
-                recognized: retryContext.originalRecognized || recognized,
-                image: retryContext.originalImage || prepared.dataUrl,
-                retryRecognized: recognized,
-                retryImage: prepared.dataUrl,
-                noStreak: true,
+            if (retryTask) {
+              commitRetrySuccess({
+                method: "ocr",
+                recognized,
+                image: prepared.dataUrl,
                 advanceDelayMs: 380
               });
             } else {
@@ -1341,27 +1461,22 @@ function saveLastWrongTasks(tasks) {
 
     function manualMarkRight() {
       const pending = state.pendingManual;
-      if (!pending || isUiLocked()) return;
+      const task = currentTask();
+      if (!pending || !task || isUiLocked()) return;
       setTransitionLock(true);
-      const retryContext = state.retryContext ? { ...state.retryContext } : null;
-      showFlash(`<div class="ok">已确认 ✅</div>`);
+      const retryTask = isRetryTask(task);
+      showFlash(retryTask ? `<div class="ok">第${getRetryNo(task)}次重试写对了 ✅</div>` : `<div class="ok">已确认 ✅</div>`);
       flashPadSuccess();
       let committed = false;
       const commit = () => {
         if (committed) return;
         committed = true;
         state.pendingManual = null;
-        if (retryContext) {
-          state.retryContext = null;
-          recordAndAdvance(retryContext.baseResult, {
-            method: retryContext.originalMethod || "retry",
-            retryResolved: true,
-            retryMethod: "manual",
-            recognized: retryContext.originalRecognized || pending.recognized || "",
-            image: retryContext.originalImage || pending.image,
-            retryRecognized: pending.recognized || "",
-            retryImage: pending.image,
-            noStreak: true,
+        if (retryTask) {
+          commitRetrySuccess({
+            method: "manual",
+            recognized: pending.recognized || "",
+            image: pending.image,
             advanceDelayMs: 380
           });
         } else {
@@ -1390,20 +1505,21 @@ function saveLastWrongTasks(tasks) {
       const pending = state.pendingManual;
       if (!pending || isUiLocked()) return;
       setTransitionLock(true);
-      enterRetryMode("wrong", {
-        originalMethod: "manual",
-        originalRecognized: pending.recognized || "",
-        originalImage: pending.image || ""
+      state.pendingManual = null;
+      commitIncorrectAndQueue("wrong", {
+        method: "manual",
+        recognized: pending.recognized || "",
+        image: pending.image || "",
+        advanceDelayMs: 900
       });
-      setTransitionLock(false);
     }
 
     function markDontKnow() {
       const task = currentTask();
-      if (!task || hasRetryContext() || isUiLocked()) return;
+      if (!task || isUiLocked()) return;
       setTransitionLock(true);
       el.dontKnowChar.textContent = task.targetChar;
-      el.nextAfterDontKnowBtn.textContent = "开始重试";
+      el.nextAfterDontKnowBtn.textContent = nextAfterDontKnowText(task);
       setFlow("dontKnow");
       setTransitionLock(false);
       persistIfNeeded();
@@ -1413,10 +1529,10 @@ function saveLastWrongTasks(tasks) {
       const task = currentTask();
       if (!task || isUiLocked()) return;
       setTransitionLock(true);
-      enterRetryMode("dontKnow", {
-        originalMethod: "dontKnow"
+      commitIncorrectAndQueue("dontKnow", {
+        method: "dontKnow",
+        advanceDelayMs: 900
       });
-      setTransitionLock(false);
     }
 
     function finishPractice() {
@@ -1439,7 +1555,21 @@ function saveLastWrongTasks(tasks) {
         const correct = autoCorrect.length + manualCorrect.length;
         const pct = total ? Math.round(correct / total * 100) : 0;
         const mistakes = state.results.filter(r => r.result !== "correct");
-        const retryTasks = state.tasks.filter(task => mistakes.some(r => r.taskId === task.id));
+        const seen = new Set();
+        const retryTasks = mistakes.map(r => ({
+          id: r.taskId,
+          lineNo: r.lineNo,
+          lineText: r.lineText,
+          targetChar: r.targetChar,
+          charIndex: r.charIndex,
+          isRetry: false,
+          retryNo: 0,
+          retryOfTaskId: ""
+        })).filter(task => {
+          if (seen.has(task.id)) return false;
+          seen.add(task.id);
+          return true;
+        });
         return { total, manualCorrect, wrong, dontKnow, correct, pct, retryTasks };
       };
 
@@ -1449,6 +1579,7 @@ function saveLastWrongTasks(tasks) {
           const resultIndex = state.results.indexOf(r);
           return `<li>
             <span>${escapeHtml(r.lineText)} ${escapeHtml(r.targetChar)}</span>
+            <span class="muted">${escapeHtml(retrySummaryText(r))}</span>
             <button type="button" class="playSummaryWrongBtn" data-result-index="${resultIndex}">🔊 听一遍</button>
           </li>`;
         }).join("")}</ul>`;
@@ -1478,7 +1609,7 @@ function saveLastWrongTasks(tasks) {
         const { total, manualCorrect, wrong, dontKnow, correct, pct, retryTasks } = recomputeSummaryData();
         saveLastWrongTasks(retryTasks);
 
-        el.progress.textContent = `已完成：${total} / ${state.tasks.length}`;
+        el.progress.textContent = `已完成：${total} / ${total}`;
         updateScore();
         el.resultFlash.innerHTML = "";
         el.actionStage.classList.add("hidden");
@@ -1584,7 +1715,8 @@ function saveLastWrongTasks(tasks) {
         pendingManual: null,
         streak: 0,
         practiceType: "normal",
-        advancePending: false
+        advancePending: false,
+        retryLog: []
       };
       el.input.value = "";
       el.preview.innerHTML = "";
@@ -1620,7 +1752,10 @@ function saveLastWrongTasks(tasks) {
           lineNo: safe.pendingManual.task.lineNo,
           lineText: safe.pendingManual.task.lineText,
           targetChar: safe.pendingManual.task.targetChar,
-          charIndex: safe.pendingManual.task.charIndex
+          charIndex: safe.pendingManual.task.charIndex,
+          isRetry: !!safe.pendingManual.task.isRetry,
+          retryOfTaskId: safe.pendingManual.task.retryOfTaskId || "",
+          retryNo: Number(safe.pendingManual.task.retryNo || 0)
         };
       }
       if (safe.retryContext) {
